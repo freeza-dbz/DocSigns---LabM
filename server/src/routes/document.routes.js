@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { verifyJWT } from '../middlewares/auth.middleware.js';
+import { upload } from '../middlewares/multer.middleware.js';
 import {
     uploadDocument,
     listUserDocuments,
@@ -6,12 +8,10 @@ import {
     deleteDocument,
     updateDocument
 } from '../controllers/document.controller.js';
-import { verifyJWT } from '../middlewares/auth.middleware.js';
-import { upload } from '../middlewares/multer.middleware.js';
 
 const router = Router();
 
-// Apply JWT verification to all routes in this file
+// Apply JWT verification to all routes in this file  
 router.use(verifyJWT);
 
 router.route('/')
