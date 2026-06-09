@@ -9,9 +9,8 @@ import mongoose from "mongoose";
 const generateAccessandRefreshTokens = async (userId) => {
     try {
         const user = await User.findById(userId);
-        const accessToken = User.generateAccessandRefreshTokens();
-        const refreshToken = User.generateAccessandRefreshTokens();
-
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
 
         user.refreshToken = refreshToken;
 
@@ -47,10 +46,10 @@ const registerUser = asyncHandler(async (req, res) => {
         username: username.toLowerCase()
     });
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+    const { accessToken, refreshToken } = await generateAccessandRefreshTokens(user._id);
 
     const createdUser = await User.findById(user._id).select(
-        "-password "
+        "-password"
     );
 
     if (!createdUser) {
@@ -97,7 +96,7 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Invalid user credentials");
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+    const { accessToken, refreshToken } = await generateAccessandRefreshTokens(user._id);
 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
