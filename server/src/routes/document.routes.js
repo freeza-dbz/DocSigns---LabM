@@ -1,26 +1,37 @@
-import { Router } from 'express';
-import { verifyJWT } from '../middleware/auth.middleware.js';
-import { upload } from '../middleware/multer.middleware.js';
+import { Router } from "express";
+import { verifyJWT } from "../middleware/auth.middleware.js";
+import { upload } from "../middleware/multer.middleware.js";
+
 import {
-    uploadDocument,
-    listUserDocuments,
-    getDocumentById,
-    deleteDocument,
-    updateDocument
-} from '../controller/document.controller.js';
+  uploadDocument,
+  getUserDocuments,
+  getDocumentById,
+  getDocumentPreview,
+  updateDocument,
+  deleteDocument,
+  getDocumentStats,
+  updateDocumentStatus,
+  searchDocuments,
+} from "../controller/document.controller.js";
 
 const router = Router();
 
-// Apply JWT verification to all routes in this file  
+// Protect all document routes
 router.use(verifyJWT);
 
-router.route('/')
-    .post(upload.single('document'), uploadDocument)
-    .get(listUserDocuments);
+// Static routes first
+router.post("/upload", upload.single("file"), uploadDocument);
+router.get("/", getUserDocuments);
+router.get("/stats", getDocumentStats);
+router.get("/search", searchDocuments);
 
-router.route('/:documentId')
-    .get(getDocumentById)
-    .patch(updateDocument)
-    .delete(deleteDocument);
+// Routes with additional segments BEFORE parameterized routes
+router.get("/:documentId/preview", getDocumentPreview);
+router.patch("/:documentId/status", updateDocumentStatus);
+
+// Parameterized routes LAST (most generic)
+router.get("/:documentId", getDocumentById);
+router.patch("/:documentId", updateDocument);
+router.delete("/:documentId", deleteDocument);
 
 export default router;

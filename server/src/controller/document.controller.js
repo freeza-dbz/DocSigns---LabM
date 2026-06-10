@@ -1,155 +1,252 @@
-import mongoose from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiErrors.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiErrors.js";
 import { Document } from "../models/document.model.js";
-import { PDFDocument as PDFLibDocument } from "pdf-lib";
-import fs from "fs/promises";
-import path from "path";
+import { uploadOnCloudinary } from "../utils/Cloudinary.js";
+import mongoose from "mongoose";
 
 
 const uploadDocument = asyncHandler(async (req, res) => {
     if (!req.file) {
-        throw new ApiError(400, "No file uploaded or file type is not a PDF.");
+        throw new ApiError(400, "No file uploaded");
     }
 
-    const filePath = req.file.path;
+    const userId = req.user._id;
+    const title = req.body.documentName || req.file.originalname;
 
     try {
-        // Extract title from request body or use filename
-        const title = req.body.title || path.parse(req.file.originalname).name;
-
-        // Get page count from the PDF
-        const pdfBytes = await fs.readFile(filePath);
-        const pdfDoc = await PDFLibDocument.load(pdfBytes);
-        const totalPages = pdfDoc.getPageCount();
+        const cloudinaryResponse = await uploadOnCloudinary(req.file.path);
+        if (!cloudinaryResponse) {
+            throw new ApiError(500, "Failed to upload file to Cloudinary");
+        }
 
         const document = await Document.create({
-            owner: req.user._id,
             title,
-            originalFilename: req.file.originalname,
-            storageKey: req.file.filename,
+            originalFileName: req.file.originalname,
+            cloudinaryPublicId: cloudinaryResponse.public_id,
+            cloudinaryUrl: cloudinaryResponse.secure_url || cloudinaryResponse.url,
             fileSize: req.file.size,
-            totalPages,
+            uploadedBy: userId,
+            totalPages: 1, 
         });
 
-        return res
-            .status(201)
-            .json(new ApiResponse(201, document, "Document uploaded successfully"));
-
+        return res.status(201).json(
+            new ApiResponse(201, document, "Document uploaded successfully")
+        );
     } catch (error) {
-        await fs.unlink(filePath);
-        throw new ApiError(500, error.message || "Failed to process the uploaded document");
+        if (error.message.includes("Cloudinary upload failed")) {
+            throw new ApiError(502, error.message);
+        }
+        throw error;
     }
 });
 
+const getUserDocuments = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { page = 1, limit = 10, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+    
+    const skip = (page - 1) * limit;
+    const sort = { [sortBy]: sortOrder === "desc" ? -1 : 1 };
 
-const listUserDocuments = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const documents = await Document.find({ uploadedBy: userId, isDeleted: false })
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit));
+        
+    const total = await Document.countDocuments({ uploadedBy: userId, isDeleted: false });
+    const result = { documents, total, page: parseInt(page), limit: parseInt(limit) };
 
-    const options = {
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
-    };
-
-    const sortOptions = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
-
-    const documents = await Document.find({ owner: req.user._id, isDeleted: false })
-        .sort(sortOptions)
-        .skip((options.page - 1) * options.limit)
-        .limit(options.limit);
-
-    const totalDocuments = await Document.countDocuments({ owner: req.user._id, isDeleted: false });
-
-    const response = {
-        documents,
-        totalPages: Math.ceil(totalDocuments / options.limit),
-        currentPage: options.page,
-        totalDocuments,
-    };
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, response, "Documents retrieved successfully"));
-});
-
+    return res.status(200).json(
+        new ApiResponse(200, result, "Documents retrieved successfully")
+    );
+}); 
 
 const getDocumentById = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
     const { documentId } = req.params;
-
+    
+    if (!documentId) {
+        throw new ApiError(400, "Document ID is required");
+    }
     if (!mongoose.isValidObjectId(documentId)) {
-        throw new ApiError(400, "Invalid document ID");
+        throw new ApiError(400, "Invalid Document ID format");
     }
 
-    const document = await Document.findOne({
-        _id: documentId,
-        owner: req.user._id,
-        isDeleted: false
-    });
+    const document = await Document.findOne({ _id: documentId, uploadedBy:   userId, isDeleted: false });
+    if (!document) {
+        throw new ApiError(404, "Document not found");  
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, document, "Document retrieved successfully")
+    );
+});
+
+const getDocumentPreview = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { documentId } = req.params;
+    
+    if (!documentId) {
+        throw new ApiError(400, "Document ID is required");
+    }
+    if (!mongoose.isValidObjectId(documentId)) {
+        throw new ApiError(400, "Invalid Document ID format");
+    }
+
+    const document = await Document.findOne({ _id: documentId, uploadedBy: userId, isDeleted: false });
+    if (!document) {
+        throw new ApiError(404, "Document not found");
+    }
+
+    // NOTE: If you want the browser to directly display/download the preview, 
+    // uncomment the line below instead of returning JSON:
+    // return res.redirect(document.cloudinaryUrl);
+
+    return res.status(200).json(
+        new ApiResponse(200, { previewUrl: document.cloudinaryUrl }, "Preview retrieved successfully")
+        );
+});
+
+const updateDocument = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { documentId } = req.params;
+    const { title } = req.body;
+    
+    if (!documentId) {
+        throw new ApiError(400, "Document ID is required");
+    }
+    if (!mongoose.isValidObjectId(documentId)) {
+        throw new ApiError(400, "Invalid Document ID format");
+    }
+
+    const document = await Document.findOneAndUpdate(
+        { _id: documentId, uploadedBy: userId, isDeleted: false },
+        { $set: { title } },
+        { new: true }
+    );
 
     if (!document) {
         throw new ApiError(404, "Document not found");
     }
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, document, "Document retrieved successfully"));
-});
-
-const updateDocument = asyncHandler(async (req, res) => {
-    const { documentId } = req.params;
-    const { title } = req.body;
-
-    if (!title || typeof title !== 'string' || title.trim() === '') {
-        throw new ApiError(400, "Title is required and must be a non-empty string.");
-    }
-
-    if (!mongoose.isValidObjectId(documentId)) {
-        throw new ApiError(400, "Invalid document ID");
-    }
-
-    const updatedDocument = await Document.findOneAndUpdate(
-        { _id: documentId, owner: req.user._id, isDeleted: false }, // Security check
-        { $set: { title: title.trim() } },
-        { new: true }
+    return res.status(200).json(
+        new ApiResponse(200, document, "Document updated successfully")
     );
-
-    if (!updatedDocument) {
-        throw new ApiError(404, "Document not found or you do not have permission to update it.");
-    }
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, updatedDocument, "Document updated successfully"));
 });
-
 
 const deleteDocument = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
     const { documentId } = req.params;
-
+    
+    if (!documentId) {
+        throw new ApiError(400, "Document ID is required");
+    }
     if (!mongoose.isValidObjectId(documentId)) {
-        throw new ApiError(400, "Invalid document ID");
+        throw new ApiError(400, "Invalid Document ID format");
     }
 
     const document = await Document.findOneAndUpdate(
-        { _id: documentId, owner: req.user._id, isDeleted: false }, // Security check
+        { _id: documentId, uploadedBy: userId, isDeleted: false },
         { $set: { isDeleted: true, deletedAt: new Date() } },
         { new: true }
     );
 
     if (!document) {
-        throw new ApiError(404, "Document not found or already deleted.");
+        throw new ApiError(404, "Document not found");
     }
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, {}, "Document deleted successfully"));
+    return res.status(200).json(
+        new ApiResponse(200, {}, "Document deleted successfully")
+    );
+});
+
+const getDocumentStats = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    const total = await Document.countDocuments({ uploadedBy: userId, isDeleted: false });
+    
+    const statsPipeline = await Document.aggregate([
+        { $match: { uploadedBy: userId, isDeleted: false } },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+
+    const stats = { total };
+    statsPipeline.forEach(stat => {
+        stats[stat._id] = stat.count;
+    });
+
+    return res.status(200).json(
+        new ApiResponse(200, stats, "Statistics retrieved successfully")
+    );
+});
+
+const updateDocumentStatus = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { documentId } = req.params;
+    const { status } = req.body;
+    
+    if (!documentId) {
+        throw new ApiError(400, "Document ID is required");
+    }
+    if (!mongoose.isValidObjectId(documentId)) {
+        throw new ApiError(400, "Invalid Document ID format");
+    }
+    if (!status) {
+        throw new ApiError(400, "Status is required");
+    }
+
+    const document = await Document.findOneAndUpdate(
+        { _id: documentId, uploadedBy: userId, isDeleted: false },
+        { $set: { status } },
+        { new: true, runValidators: true } // runValidators ensures the status matches your enum
+    );
+
+    if (!document) {
+        throw new ApiError(404, "Document not found");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, document, "Document status updated successfully")
+    );
+});
+
+const searchDocuments = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { q, page = 1, limit = 10 } = req.query;
+
+    if (!q || q.trim() === "") {
+        throw new ApiError(400, "Search query is required");
+    }
+
+    const skip = (page - 1) * limit;
+
+    const documents = await Document.find({
+        uploadedBy: userId,
+        isDeleted: false,
+        title: { $regex: q, $options: "i" }
+    }).skip(skip).limit(parseInt(limit));
+
+    const total = await Document.countDocuments({
+        uploadedBy: userId,
+        isDeleted: false,
+        title: { $regex: q, $options: "i" }
+    });
+
+    const result = { documents, total, page: parseInt(page), limit: parseInt(limit) };
+
+    return res.status(200).json(
+        new ApiResponse(200, result, "Search results retrieved successfully")
+    );
 });
 
 export {
     uploadDocument,
-    listUserDocuments,
+    getUserDocuments,
     getDocumentById,
+    getDocumentPreview,
     updateDocument,
     deleteDocument,
+    getDocumentStats,
+    updateDocumentStatus,
+    searchDocuments,
 };
