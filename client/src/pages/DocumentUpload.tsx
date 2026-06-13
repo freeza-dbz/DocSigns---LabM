@@ -8,12 +8,14 @@ import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/common/Card';
 import { Upload, FileText, AlertCircle } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const DocumentUpload: React.FC = () => {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const {
     register,
@@ -69,17 +71,65 @@ const DocumentUpload: React.FC = () => {
   };
 
   const onSubmit = async (data: DocumentUploadInput) => {
+    setApiError(null);
     try {
       setUploadProgress(30);
-      await documentApi.uploadDocument(data.file, data.documentName);
+
+      const fileToUpload = data.file || selectedFile;
+      if (!fileToUpload) throw new Error('No file selected');
+      const res_data = await documentApi.uploadDocument(fileToUpload, data.documentName);
       setUploadProgress(100);
-      
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 500);
-    } catch (error) {
-      console.error('Upload failed:', error);
+
+      if (res_data.success) {
+        Swal.fire({
+          position: 'center',
+          icon: 'success',
+          title: 'Document Uploaded!',
+          text: 'Your document has been successfully uploaded.',
+          showConfirmButton: false,
+          timer: 2000,
+          showClass: {
+            popup: `animate__animated animate__fadeInUp animate__faster`,
+          },
+          hideClass: {
+            popup: `animate__animated animate__fadeOutDown animate__faster`,
+          },
+        });
+
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2100);
+      } else {
+        const errorMessage = res_data.message || 'Upload failed. Please try again.';
+        setApiError(errorMessage);
+        setUploadProgress(0);
+        Swal.fire({
+          position: 'center',
+          icon: 'error',
+          title: 'Upload Failed',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444',
+        });
+      }
+    } catch (err: any) {
+      console.error('Upload failed:', err);
       setUploadProgress(0);
+      let errorMsg = 'An error occurred during upload';
+
+      if (err.response?.data) {
+        errorMsg = err.response.data.message || errorMsg;
+      } else if (err instanceof Error) {
+        errorMsg = err.message;
+      }
+
+      setApiError(errorMsg);
+      Swal.fire({
+        position: 'center',
+        icon: 'error',
+        title: 'Upload Error',
+        text: errorMsg,
+        confirmButtonColor: '#ef4444',
+      });
     }
   };
 
@@ -98,6 +148,13 @@ const DocumentUpload: React.FC = () => {
           <h1 className="text-3xl font-bold text-text-primary">Upload Document</h1>
           <p className="text-text-secondary mt-2">Upload a PDF document to get started with signing</p>
         </div>
+
+        {apiError && (
+          <div className="mb-8 p-4 bg-danger-light border border-danger rounded-lg flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-danger flex-shrink-0" />
+            <p className="font-medium text-danger text-sm">{apiError}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-8">
@@ -144,7 +201,7 @@ const DocumentUpload: React.FC = () => {
                       Choose File
                     </Button>
                   </label>
-                  <p className="text-gray-500 text-xs mt-4">PDF files only • Max 50MB</p>
+                  <p className="text-gray-500 text-xs mt-4">PDF files only � Max 50MB</p>
                 </div>
 
                 {selectedFile && (
@@ -154,7 +211,7 @@ const DocumentUpload: React.FC = () => {
                       <div className="flex-1">
                         <p className="font-medium text-success">{selectedFile.name}</p>
                         <p className="text-sm text-text-secondary">
-                          {formatFileSize(selectedFile.size)} • PDF Document
+                          {formatFileSize(selectedFile.size)} � PDF Document
                         </p>
                       </div>
                     </div>

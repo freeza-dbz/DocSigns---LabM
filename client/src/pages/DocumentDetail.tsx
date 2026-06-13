@@ -23,7 +23,7 @@ const DocumentDetail: React.FC = () => {
     const loadDocument = async () => {
       try {
         setIsLoading(true);
-        const result = await documentApi.getDocument(documentId!);
+        const result = await documentApi.getDocument(document?._id || documentId!);
         setDocument(result.data);
       } catch (error) {
         console.error('Failed to load document:', error);
@@ -57,7 +57,7 @@ const DocumentDetail: React.FC = () => {
 
     const newField: SignatureField = {
       id: `field-${Date.now()}`,
-      documentId: documentId!,
+      documentId: document?._id || documentId!,
       pageNumber: currentPage,
       x,
       y,
@@ -114,7 +114,7 @@ const DocumentDetail: React.FC = () => {
           </div>
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold text-text-primary">{document.name}</h1>
+              <h1 className="text-3xl font-bold text-text-primary">{document.title || document.name}</h1>
               <div className="flex items-center gap-4 mt-2">
                 <StatusBadge status={document.status} />
                 <span className="text-sm text-text-secondary">
@@ -195,7 +195,7 @@ const DocumentDetail: React.FC = () => {
                       <div className="text-center space-y-4">
                         <FileText className="mx-auto text-text-muted" size={48} />
                         <div>
-                          <p className="font-semibold text-text-primary">{document.name}</p>
+                          <p className="font-semibold text-text-primary">{document.title || document.name}</p>
                           <p className="text-sm text-text-secondary mt-2">Page {currentPage} of {numPages}</p>
                         </div>
                       </div>
@@ -279,7 +279,7 @@ const DocumentDetail: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-text-secondary">Owner</p>
-                  <p className="font-medium text-text-primary mt-1">{document.ownerName}</p>
+                  <p className="font-medium text-text-primary mt-1">{document.ownerName || 'Me'}</p>
                 </div>
               </CardContent>
             </Card>

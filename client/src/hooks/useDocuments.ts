@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 import { documentApi } from '@/services/documentApi';
-import { Document, PaginationParams } from '@/types';
+import { Document as AppDocument, PaginationParams } from '@/types';
 
 export const useDocuments = () => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<AppDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +17,8 @@ export const useDocuments = () => {
         params.search,
         params.status
       );
-      setDocuments(result.data.items);
+      // Backend returns ApiResponse: { data: { documents: [], total: ... } }
+      setDocuments(result.data?.documents || []);
       return result.data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch documents';

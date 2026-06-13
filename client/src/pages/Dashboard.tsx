@@ -14,6 +14,7 @@ const Dashboard: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<DocumentStatus | 'all'>('all');
   const [page, setPage] = useState(1);
+  const [docStats, setDocStats] = useState({ total: 0, PENDING: 0, COMPLETED: 0, DRAFT: 0 });
 
   useEffect(() => {
     const loadDocuments = async () => {
@@ -25,7 +26,10 @@ const Dashboard: React.FC = () => {
           search || undefined,
           filterStatus === 'all' ? undefined : filterStatus
         );
-        setDocuments(result.data.items);
+        setDocuments(result.data?.documents || []);
+
+        const statsResult = await documentApi.getDocumentStats();
+        setDocStats(statsResult.data || { total: 0, PENDING: 0, COMPLETED: 0, DRAFT: 0 });
       } catch (error) {
         console.error('Failed to load documents:', error);
       } finally {
@@ -40,25 +44,25 @@ const Dashboard: React.FC = () => {
   const stats = [
     {
       title: 'Total Documents',
-      value: '12',
+      value: docStats.total.toString(),
       icon: FileText,
       color: 'bg-blue-100 text-blue-600',
     },
     {
       title: 'Pending Signatures',
-      value: '3',
+      value: (docStats.PENDING || 0).toString(),
       icon: Clock,
       color: 'bg-yellow-100 text-yellow-600',
     },
     {
       title: 'Completed',
-      value: '8',
+      value: (docStats.COMPLETED || 0).toString(),
       icon: CheckCircle,
       color: 'bg-green-100 text-green-600',
     },
     {
       title: 'Drafts',
-      value: '1',
+      value: (docStats.DRAFT || 0).toString(),
       icon: Archive,
       color: 'bg-gray-100 text-gray-600',
     },
@@ -182,20 +186,20 @@ const Dashboard: React.FC = () => {
                   </thead>
                   <tbody>
                     {documents.map((doc) => (
-                      <tr key={doc.id} className="border-b border-border hover:bg-background-secondary transition-colors duration-200">
+                      <tr key={doc._id || doc.id} className="border-b border-border hover:bg-background-secondary transition-colors duration-200">
                         <td className="py-4 px-4">
-                          <Link to={`/documents/${doc.id}`} className="text-primary hover:opacity-80 font-medium transition-opacity duration-200">
-                            {doc.name}
+                          <Link to={`/documents/${doc._id || doc.id}`} className="text-primary hover:opacity-80 font-medium transition-opacity duration-200">
+                            {doc.title || doc.name}
                           </Link>
                         </td>
-                        <td className="py-4 px-4 text-text-primary">{doc.ownerName}</td>
+                        <td className="py-4 px-4 text-text-primary">{doc.ownerName || 'Me'}</td>
                         <td className="py-4 px-4">
                           <StatusBadge status={doc.status} />
                         </td>
                         <td className="py-4 px-4 text-text-secondary text-sm">{formatDate(doc.createdAt)}</td>
                         <td className="py-4 px-4 text-text-secondary text-sm">{formatFileSize(doc.fileSize)}</td>
                         <td className="py-4 px-4 text-right">
-                          <Link to={`/documents/${doc.id}`}>
+                          <Link to={`/documents/${doc._id || doc.id}`}>
                             <Button variant="ghost" size="sm">
                               View
                             </Button>

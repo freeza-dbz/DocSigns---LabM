@@ -44,7 +44,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className, ...
     declined: { label: 'Declined', variant: 'danger' as const },
   };
 
-  const config = statusConfig[status];
+  const normalizedStatus = status?.toLowerCase(); const config = statusConfig[normalizedStatus as keyof typeof statusConfig] || { label: status, variant: 'default' };
 
   return (
     <Badge variant={config.variant} className={className} {...props}>

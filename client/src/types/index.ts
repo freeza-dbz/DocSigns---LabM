@@ -7,20 +7,24 @@ export interface User {
 }
 
 export interface Document {
-  id: string;
-  name: string;
-  ownerId: string;
-  ownerName: string;
+  id?: string;
+  _id?: string;
+  name?: string;
+  title?: string;
+  ownerId?: string;
+  ownerName?: string;
+  uploadedBy?: string;
   status: DocumentStatus;
-  fileUrl: string;
+  fileUrl?: string;
+  cloudinaryUrl?: string;
   fileSize: number;
   totalPages: number;
   createdAt: Date;
-  updatedAt: Date;
-  signatureFieldCount: number;
+  updatedAt?: Date;
+  signatureFieldCount?: number;
 }
 
-export type DocumentStatus = 'draft' | 'pending' | 'signed' | 'completed';
+export type DocumentStatus = 'draft' | 'pending' | 'signed' | 'completed' | string;
 
 export interface SignatureField {
   id: string;
@@ -46,7 +50,7 @@ export interface SignatureRequest {
   createdAt: Date;
 }
 
-export type SignatureStatus = 'pending' | 'viewed' | 'signed' | 'declined';
+export type SignatureStatus = 'pending' | 'viewed' | 'signed' | 'declined' | string;
 
 export interface AuditLog {
   id: string;
