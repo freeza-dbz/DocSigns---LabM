@@ -22,6 +22,7 @@ export interface Document {
   createdAt: Date;
   updatedAt?: Date;
   signatureFieldCount?: number;
+  signatureFields?: any[];
 }
 
 export type DocumentStatus = 'draft' | 'pending' | 'signed' | 'completed' | string;
@@ -91,3 +92,4 @@ export interface Notification {
   message: string;
   timestamp: Date;
 }
+

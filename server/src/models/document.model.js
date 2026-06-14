@@ -2,9 +2,13 @@ import mongoose, { Schema } from "mongoose";
 
 export const DocumentStatus = {
     DRAFT: "DRAFT",
+    SENT: "SENT",
+    VIEWED: "VIEWED",
     PENDING: "PENDING",
+    SIGNED: "SIGNED",
     COMPLETED: "COMPLETED",
-    REJECTED: "REJECTED"
+    REJECTED: "REJECTED",
+    EXPIRED: "EXPIRED"
 };
 
 const documentSchema = new Schema(
@@ -72,3 +76,4 @@ documentSchema.index({ uploadedBy: 1, isDeleted: 1, createdAt: -1 });
 documentSchema.index({ uploadedBy: 1, status: 1, isDeleted: 1 });
 
 export const Document = mongoose.model("Document", documentSchema);
+

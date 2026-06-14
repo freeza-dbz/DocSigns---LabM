@@ -18,6 +18,18 @@ export const documentApi = {
     }
   },
 
+  // Get document preview
+  getDocumentPreview: async (documentId: string) => {
+    try {
+      const response = await apiClient.get('/v1/documents/' + documentId + '/preview', {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Get document by ID
   getDocument: async (documentId: string) => {
     try {
@@ -70,6 +82,16 @@ export const documentApi = {
   },
 
   // Update document status
+    // Save signature fields
+  saveSignatureFields: async (documentId: string, signatureFields: any[]) => {
+    try {
+      const response = await apiClient.post('/v1/documents/' + documentId + '/signature-fields', { signatureFields });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   updateDocumentStatus: async (documentId: string, status: string) => {
     try {
       const response = await apiClient.patch('/v1/documents/' + documentId + '/status', { status });
@@ -79,3 +101,6 @@ export const documentApi = {
     }
   }
 };
+
+
+

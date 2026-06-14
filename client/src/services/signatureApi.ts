@@ -2,10 +2,11 @@ import apiClient from './apiClient';
 import { SignatureField, SignatureRequest } from '@/types';
 
 export const signatureApi = {
-  // Add signature field
-  addSignatureField: async (documentId: string, field: Omit<SignatureField, 'id'>) => {
+  // Save all signature fields for a document
+  saveSignatureFields: async (documentId: string, signatureFields: any[]) => {
     try {
-      return await apiClient.post(`/documents/${documentId}/signature-fields`, field);
+      const response = await apiClient.post('/v1/signatures/' + documentId, { signatureFields });
+      return response.data;
     } catch (error) {
       throw error;
     }
@@ -14,63 +15,39 @@ export const signatureApi = {
   // Get signature fields for document
   getSignatureFields: async (documentId: string) => {
     try {
-      return await apiClient.get<SignatureField[]>(`/documents/${documentId}/signature-fields`);
+      const response = await apiClient.get('/v1/signatures/' + documentId);
+      return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Update signature field
-  updateSignatureField: async (
-    documentId: string,
-    fieldId: string,
-    data: Partial<SignatureField>
-  ) => {
-    try {
-      return await apiClient.put(
-        `/documents/${documentId}/signature-fields/${fieldId}`,
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  // Delete signature field
-  deleteSignatureField: async (documentId: string, fieldId: string) => {
-    try {
-      return await apiClient.delete(`/documents/${documentId}/signature-fields/${fieldId}`);
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  // Create signature request
+  // Create signature request (placeholder for future use)
   createSignatureRequest: async (documentId: string, request: Omit<SignatureRequest, 'id' | 'createdAt'>) => {
     try {
-      return await apiClient.post(`/documents/${documentId}/signature-requests`, request);
+      return await apiClient.post('/v1/signatures/' + documentId + '/requests', request);
     } catch (error) {
       throw error;
     }
   },
 
-  // Get signature requests
+  // Get signature requests (placeholder for future use)
   getSignatureRequests: async (documentId: string) => {
     try {
-      return await apiClient.get<SignatureRequest[]>(`/documents/${documentId}/signature-requests`);
+      return await apiClient.get<SignatureRequest[]>('/v1/signatures/' + documentId + '/requests');
     } catch (error) {
       throw error;
     }
   },
 
-  // Submit signature
+  // Submit signature (placeholder for future use)
   submitSignature: async (
     documentId: string,
     fieldId: string,
     signatureData: string
   ) => {
     try {
-      return await apiClient.post(`/documents/${documentId}/signatures`, {
+      return await apiClient.post('/v1/signatures/' + documentId + '/submit', {
         fieldId,
         signatureData,
       });

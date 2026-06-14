@@ -98,13 +98,7 @@ const getDocumentPreview = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Document not found");
     }
 
-    // NOTE: If you want the browser to directly display/download the preview, 
-    // uncomment the line below instead of returning JSON:
-    // return res.redirect(document.cloudinaryUrl);
-
-    return res.status(200).json(
-        new ApiResponse(200, { previewUrl: document.cloudinaryUrl }, "Preview retrieved successfully")
-        );
+    return res.redirect(document.cloudinaryUrl);
 });
 
 const updateDocument = asyncHandler(async (req, res) => {
@@ -239,6 +233,8 @@ const searchDocuments = asyncHandler(async (req, res) => {
     );
 });
 
+
+
 export {
     uploadDocument,
     getUserDocuments,
@@ -249,4 +245,6 @@ export {
     getDocumentStats,
     updateDocumentStatus,
     searchDocuments,
+    
 };
+

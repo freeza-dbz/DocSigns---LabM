@@ -12,6 +12,7 @@ import {
   getDocumentStats,
   updateDocumentStatus,
   searchDocuments,
+  
 } from "../controller/document.controller.js";
 
 const router = Router();
@@ -29,9 +30,11 @@ router.get("/search", searchDocuments);
 router.get("/:documentId/preview", getDocumentPreview);
 router.patch("/:documentId/status", updateDocumentStatus);
 
+
 // Parameterized routes LAST (most generic)
 router.get("/:documentId", getDocumentById);
 router.patch("/:documentId", updateDocument);
 router.delete("/:documentId", deleteDocument);
 
 export default router;
+

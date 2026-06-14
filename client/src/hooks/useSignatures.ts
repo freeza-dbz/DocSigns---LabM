@@ -24,36 +24,23 @@ export const useSignatures = (documentId: string) => {
     }
   }, [documentId]);
 
-  const addSignatureField = useCallback(
-    async (field: Omit<SignatureField, 'id'>) => {
+  const saveSignatureFields = useCallback(
+    async (newFields: SignatureField[]) => {
       try {
         setError(null);
-        const response = await signatureApi.addSignatureField(documentId, field);
-        setFields([...fields, response.data]);
+        const response = await signatureApi.saveSignatureFields(documentId, newFields);
+        setFields(response.data);
         return response.data;
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to add signature field';
+        const message = err instanceof Error ? err.message : 'Failed to save signature fields';
         setError(message);
         throw err;
       }
     },
-    [documentId, fields]
+    [documentId]
   );
 
-  const deleteSignatureField = useCallback(
-    async (fieldId: string) => {
-      try {
-        setError(null);
-        await signatureApi.deleteSignatureField(documentId, fieldId);
-        setFields(fields.filter((f) => f.id !== fieldId));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to delete signature field';
-        setError(message);
-        throw err;
-      }
-    },
-    [documentId, fields]
-  );
+  
 
   const fetchSignatureRequests = useCallback(async () => {
     try {
@@ -92,8 +79,7 @@ export const useSignatures = (documentId: string) => {
     isLoading,
     error,
     fetchSignatureFields,
-    addSignatureField,
-    deleteSignatureField,
+    saveSignatureFields,
     fetchSignatureRequests,
     submitSignature,
   };
