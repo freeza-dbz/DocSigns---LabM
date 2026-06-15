@@ -12,6 +12,7 @@ import {
   getDocumentStats,
   updateDocumentStatus,
   searchDocuments,
+  getDocumentAuditLogs,
   
 } from "../controller/document.controller.js";
 
@@ -28,6 +29,7 @@ router.get("/search", searchDocuments);
 
 // Routes with additional segments BEFORE parameterized routes
 router.get("/:documentId/preview", getDocumentPreview);
+router.get("/:documentId/audit-logs", getDocumentAuditLogs);
 router.patch("/:documentId/status", updateDocumentStatus);
 
 

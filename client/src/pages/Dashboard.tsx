@@ -5,7 +5,7 @@ import { Document, DocumentStatus } from '@/types';
 import Button from '@/components/common/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/common/Card';
 import { StatusBadge } from '@/components/common/Badge';
-import { FileText, Plus, Search, Clock, CheckCircle, Archive } from 'lucide-react';
+import { FileText, Plus, Search, Clock, CheckCircle, Archive, History } from 'lucide-react';
 import Input from '@/components/common/Input';
 
 const Dashboard: React.FC = () => {
@@ -199,11 +199,18 @@ const Dashboard: React.FC = () => {
                         <td className="py-4 px-4 text-text-secondary text-sm">{formatDate(doc.createdAt)}</td>
                         <td className="py-4 px-4 text-text-secondary text-sm">{formatFileSize(doc.fileSize)}</td>
                         <td className="py-4 px-4 text-right">
-                          <Link to={`/documents/${doc._id || doc.id}`}>
-                            <Button variant="ghost" size="sm">
-                              View
-                            </Button>
-                          </Link>
+                          <div className="flex justify-end gap-2">
+                            <Link to={`/documents/${doc._id || doc.id}`}>
+                              <Button variant="ghost" size="sm">
+                                View
+                              </Button>
+                            </Link>
+                            <Link to={`/audit-trail/${doc._id || doc.id}`}>
+                              <Button variant="ghost" size="sm" title="Audit Trail">
+                                <History size={16} />
+                              </Button>
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}

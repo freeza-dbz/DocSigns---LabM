@@ -59,10 +59,10 @@ export const useSignatures = (documentId: string) => {
   }, [documentId]);
 
   const submitSignature = useCallback(
-    async (fieldId: string, signatureData: string) => {
+    async (token: string, fieldId: string, signatureData: string, signatureMethod: string = 'DRAW') => {
       try {
         setError(null);
-        const response = await signatureApi.submitSignature(documentId, fieldId, signatureData);
+        const response = await signatureApi.submitSignature(token, fieldId, signatureData, signatureMethod);
         return response.data;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to submit signature';
@@ -70,7 +70,7 @@ export const useSignatures = (documentId: string) => {
         throw err;
       }
     },
-    [documentId]
+    []
   );
 
   return {

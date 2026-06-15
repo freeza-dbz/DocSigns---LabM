@@ -41,6 +41,7 @@ export interface SignatureField {
 
 export interface SignatureRequest {
   id: string;
+  _id?: string;
   documentId: string;
   signerName: string;
   signerEmail: string;
@@ -55,11 +56,14 @@ export type SignatureStatus = 'pending' | 'viewed' | 'signed' | 'declined' | str
 
 export interface AuditLog {
   id: string;
+  _id?: string;
   documentId: string;
-  eventType: AuditEventType;
-  user: string;
+  eventType: AuditEventType | string;
+  user?: any;
+  signerEmail?: string;
   ipAddress: string;
   timestamp: Date;
+  createdAt?: Date;
   metadata?: Record<string, unknown>;
 }
 
@@ -92,4 +96,3 @@ export interface Notification {
   message: string;
   timestamp: Date;
 }
-

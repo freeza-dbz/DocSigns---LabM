@@ -5,7 +5,7 @@ export const signatureApi = {
   // Save all signature fields for a document
   saveSignatureFields: async (documentId: string, signatureFields: any[]) => {
     try {
-      const response = await apiClient.post('/v1/signatures/' + documentId, { signatureFields });
+      const response = await apiClient.post('/v1/signatures/' + documentId + '/fields', { signatureFields });
       return response.data;
     } catch (error) {
       throw error;
@@ -15,42 +15,57 @@ export const signatureApi = {
   // Get signature fields for document
   getSignatureFields: async (documentId: string) => {
     try {
-      const response = await apiClient.get('/v1/signatures/' + documentId);
+      const response = await apiClient.get('/v1/signatures/' + documentId + '/fields');
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Create signature request (placeholder for future use)
+  // Create signature request
   createSignatureRequest: async (documentId: string, request: Omit<SignatureRequest, 'id' | 'createdAt'>) => {
     try {
-      return await apiClient.post('/v1/signatures/' + documentId + '/requests', request);
+      const response = await apiClient.post('/v1/signatures/' + documentId + '/requests', request);
+      return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Get signature requests (placeholder for future use)
+  // Get signature requests
   getSignatureRequests: async (documentId: string) => {
     try {
-      return await apiClient.get<SignatureRequest[]>('/v1/signatures/' + documentId + '/requests');
+      const response = await apiClient.get('/v1/signatures/' + documentId + '/requests');
+      return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Submit signature (placeholder for future use)
+  // Get public signature request
+  getPublicSignatureRequest: async (token: string) => {
+    try {
+      const response = await apiClient.get('/v1/signatures/public/' + token);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Submit signature
   submitSignature: async (
-    documentId: string,
+    token: string,
     fieldId: string,
-    signatureData: string
+    signatureData: string,
+    signatureMethod: string = 'DRAW'
   ) => {
     try {
-      return await apiClient.post('/v1/signatures/' + documentId + '/submit', {
+      const response = await apiClient.post('/v1/signatures/public/' + token + '/submit', {
         fieldId,
         signatureData,
+        signatureMethod
       });
+      return response.data;
     } catch (error) {
       throw error;
     }

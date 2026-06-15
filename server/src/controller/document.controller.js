@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiErrors.js";
 import { Document } from "../models/document.model.js";
 import { uploadOnCloudinary } from "../utils/Cloudinary.js";
 import mongoose from "mongoose";
+import { AuditLog } from "../models/audit-log.model.js";
 
 
 const uploadDocument = asyncHandler(async (req, res) => {
@@ -235,6 +236,30 @@ const searchDocuments = asyncHandler(async (req, res) => {
 
 
 
+
+const getDocumentAuditLogs = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { documentId } = req.params;
+    
+    if (!documentId) {
+        throw new ApiError(400, "Document ID is required");
+    }
+    if (!mongoose.isValidObjectId(documentId)) {
+        throw new ApiError(400, "Invalid Document ID format");
+    }
+
+    const document = await Document.findOne({ _id: documentId, uploadedBy: userId, isDeleted: false });
+    if (!document) {
+        throw new ApiError(404, "Document not found");
+    }
+
+    const auditLogs = await AuditLog.find({ documentId }).sort({ createdAt: -1 }).populate('user', 'fullName email');
+
+    return res.status(200).json(
+        new ApiResponse(200, auditLogs, "Audit logs retrieved successfully")
+    );
+});
+
 export {
     uploadDocument,
     getUserDocuments,
@@ -245,6 +270,6 @@ export {
     getDocumentStats,
     updateDocumentStatus,
     searchDocuments,
-    
+    getDocumentAuditLogs
 };
 

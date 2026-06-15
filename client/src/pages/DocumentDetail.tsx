@@ -370,7 +370,7 @@ const DocumentDetail: React.FC = () => {
                   <Save size={18} />
                   {isSaving ? 'Saving...' : 'Save Coordinates'}
                 </Button>
-                <Button variant="outline" fullWidth>
+                <Button variant="outline" fullWidth onClick={() => navigate("/documents/" + (document._id || documentId) + "/send")}>
                   Send for Signing
                 </Button>
               </CardContent>
