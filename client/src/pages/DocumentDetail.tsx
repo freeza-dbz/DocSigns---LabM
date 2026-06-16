@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { documentApi } from '@/services/documentApi';
-import { signatureApi } from '@/services/signatureApi';
-import { Document, SignatureField } from '@/types';
-import Button from '@/components/common/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/common/Card';
-import { StatusBadge } from '@/components/common/Badge';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, FileText, Save } from 'lucide-react';
+import { documentApi } from '../services/documentApi';
+import { signatureApi } from '../services/signatureApi';
+import { Document, SignatureField } from '../types';
+import Button from '../components/common/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/common/Card';
+import { StatusBadge } from '../components/common/Badge';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import { Document as PdfDocument, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+// Setup PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
 const DocumentDetail: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
   const [document, setDocument] = useState<Document | null>(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
@@ -21,7 +28,8 @@ const DocumentDetail: React.FC = () => {
   const [selectedField, setSelectedField] = useState<SignatureField | null>(null);
   const [isPlacingField, setIsPlacingField] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+  const [isSending, setIsSending] = useState(false);
+
   // Drag state
   const [dragState, setDragState] = useState<{ fieldId: string, startX: number, startY: number, initialX: number, initialY: number } | null>(null);
 
@@ -29,8 +37,12 @@ const DocumentDetail: React.FC = () => {
     const loadDocument = async () => {
       try {
         setIsLoading(true);
-        const result = await documentApi.getDocument(document?._id || documentId!);
+        const result = await documentApi.getDocument(documentId!);
         setDocument(result.data);
+        try {
+          const blob = await documentApi.getDocumentPreview(documentId!);
+          setPdfBlob(blob);
+        } catch (e) { console.error(e); }
       } catch (error) {
         console.error('Failed to load document:', error);
       } finally {
@@ -45,31 +57,35 @@ const DocumentDetail: React.FC = () => {
 
   useEffect(() => {
     if (document) {
-      setNumPages(document.totalPages || 5);
-      
+
       const fetchSignatureFields = async () => {
         try {
-          const response = await signatureApi.getSignatureFields(document._id || documentId!);
+          const response = await signatureApi.getSignatureFields(documentId!);
           if (response.data && response.data.length > 0) {
             setSignatureFields(response.data.map((f: any) => ({
               id: f._id || `field-${Date.now()}-${Math.random()}`,
-              documentId: document._id || documentId!,
+              documentId: documentId!,
               pageNumber: f.page,
               x: f.x,
               y: f.y,
               width: f.width || 150,
               height: f.height || 60,
-              isSigned: f.isSigned || false
+              isSigned: f.isSigned || false,
+              signatureData: f.signatureDataUrl || f.signatureData, // For displaying signed fields
             })));
           }
         } catch (error) {
           console.error('Failed to load signature fields:', error);
         }
       };
-      
+
       fetchSignatureFields();
     }
   }, [document, documentId]);
+
+  const onDocumentLoadSuccess = ({ numPages: nextNumPages }: { numPages: number }) => {
+    setNumPages(nextNumPages);
+  };
 
   const handleAddSignatureField = () => {
     setIsPlacingField(true);
@@ -83,7 +99,7 @@ const DocumentDetail: React.FC = () => {
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
     const newField: SignatureField = {
-      id: `field-${Date.now()}`,
+      id: `field-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       documentId: document?._id || documentId!,
       pageNumber: currentPage,
       x,
@@ -121,24 +137,33 @@ const DocumentDetail: React.FC = () => {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!dragState) return;
-    
+
+    const field = signatureFields.find(f => f.id === dragState.fieldId);
+    if (!field) return;
+
     // We get the rect of the container to calculate percentages
     const container = e.currentTarget as HTMLDivElement;
     const rect = container.getBoundingClientRect();
-    
+
     // Pixel diff
     const dx = e.clientX - dragState.startX;
     const dy = e.clientY - dragState.startY;
-    
+
+    const unscaledWidth = rect.width / (zoom / 100);
+    const unscaledHeight = rect.height / (zoom / 100);
+
     // Convert to percent relative to the container
-    const dxPercent = (dx / (rect.width / (zoom / 100))) * 100;
-    const dyPercent = (dy / (rect.height / (zoom / 100))) * 100;
-    
+    const dxPercent = (dx / unscaledWidth) * 100;
+    const dyPercent = (dy / unscaledHeight) * 100;
+
+    const fieldWidthPercent = (field.width / unscaledWidth) * 100;
+    const fieldHeightPercent = (field.height / unscaledHeight) * 100;
+
     // Bound the values
-    let newX = Math.max(0, Math.min(100 - (150 / rect.width * 100), dragState.initialX + dxPercent));
-    let newY = Math.max(0, Math.min(100 - (60 / rect.height * 100), dragState.initialY + dyPercent));
-    
-    setSignatureFields(prev => prev.map(f => 
+    let newX = Math.max(0, Math.min(100 - fieldWidthPercent, dragState.initialX + dxPercent));
+    let newY = Math.max(0, Math.min(100 - fieldHeightPercent, dragState.initialY + dyPercent));
+
+    setSignatureFields(prev => prev.map(f =>
       f.id === dragState.fieldId ? { ...f, x: newX, y: newY } : f
     ));
   };
@@ -147,10 +172,9 @@ const DocumentDetail: React.FC = () => {
     setDragState(null);
   };
 
-  const handleSaveFields = async () => {
-    if (!document) return;
+  const saveFields = async (): Promise<boolean> => {
+    if (!document) return false;
     try {
-      setIsSaving(true);
       const fieldsToSave = signatureFields.map(f => ({
         page: f.pageNumber,
         x: f.x,
@@ -158,14 +182,35 @@ const DocumentDetail: React.FC = () => {
         width: f.width,
         height: f.height
       }));
-      await signatureApi.saveSignatureFields(document._id || documentId!, fieldsToSave);
-      toast.success('Signature fields saved successfully');
+      await signatureApi.saveSignatureFields(document?._id || documentId!, fieldsToSave);
+      return true;
     } catch (error) {
       console.error('Failed to save fields:', error);
-      toast.error('Failed to save signature fields');
-    } finally {
-      setIsSaving(false);
+      return false;
     }
+  };
+
+  const handleSaveCoordinates = async () => {
+    setIsSaving(true);
+    const success = await saveFields();
+    if (success) {
+      toast.success('Signature fields saved successfully');
+    } else {
+      toast.error('Failed to save signature fields');
+    }
+    setIsSaving(false);
+  };
+
+  const handleSendForSigning = async () => {
+    setIsSending(true);
+    const success = await saveFields();
+    if (success) {
+      toast.success('Coordinates saved.');
+      navigate(`/documents/${document?._id || documentId}/send`);
+    } else {
+      toast.error('Could not save coordinates before sending.');
+    }
+    setIsSending(false);
   };
 
   if (isLoading) {
@@ -203,7 +248,7 @@ const DocumentDetail: React.FC = () => {
               variant="ghost"
               onClick={() => navigate('/dashboard')}
             >
-              ? Back
+              ← Back
             </Button>
           </div>
           <div className="flex justify-between items-start">
@@ -212,7 +257,7 @@ const DocumentDetail: React.FC = () => {
               <div className="flex items-center gap-4 mt-2">
                 <StatusBadge status={document.status} />
                 <span className="text-sm text-text-secondary">
-                  {document.totalPages} pages � {document.signatureFieldCount || signatureFields.length} signature fields
+                  {numPages || document.totalPages} pages • {document.signatureFieldCount || signatureFields.length} signature fields
                 </span>
               </div>
             </div>
@@ -220,7 +265,7 @@ const DocumentDetail: React.FC = () => {
               variant="primary"
               onClick={handleAddSignatureField}
               className="flex items-center gap-2"
-              disabled={isPlacingField}
+              disabled={isPlacingField || isSaving || isSending}
             >
               <Plus size={20} />
               {isPlacingField ? 'Click to place field...' : 'Add Signature Field'}
@@ -237,7 +282,7 @@ const DocumentDetail: React.FC = () => {
                   <div>
                     <CardTitle>Document Preview</CardTitle>
                     <CardDescription>
-                      {isPlacingField && '?? Click to place a signature field'}
+                      {isPlacingField && '👇 Click to place a signature field'}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -263,66 +308,49 @@ const DocumentDetail: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div
-                  className={`border-2 border-border rounded-lg overflow-auto flex justify-center items-center p-4 transition-colors duration-200 bg-background-secondary ${
-                    isPlacingField ? 'cursor-crosshair' : ''
-                  }`}
-                  style={{ maxHeight: '600px', minHeight: '400px', position: 'relative' }}
+                  className={`border-2 border-border rounded-lg overflow-auto flex justify-center p-4 transition-colors duration-200 bg-gray-100 dark:bg-background-secondary ${isPlacingField ? 'cursor-crosshair' : ''
+                    }`}
+                  style={{ maxHeight: '70vh', minHeight: '400px' }}
                 >
-                  {/* PDF Placeholder - Mock viewer */}
-                  <div className="relative w-full max-w-2xl bg-white dark:bg-surface-secondary p-8 rounded-lg shadow-sm border border-border">
-                    {/* Page indicator */}
-                    <div className="text-center mb-6 pb-4 border-b border-border">
-                      <p className="text-text-secondary text-sm">Page {currentPage} of {numPages}</p>
-                    </div>
-
-                    {/* PDF Content Area */}
-                    <div
-                      className="min-h-96 bg-white dark:bg-surface-tertiary rounded flex items-center justify-center relative select-none"
-                      style={{
-                        transform: `scale(${zoom / 100})`,
-                        transformOrigin: 'center',
-                        transition: dragState ? 'none' : 'transform 0.2s',
-                        overflow: 'hidden'
-                      }}
-                      onClick={handlePageClick}
-                      onMouseMove={handleMouseMove}
-                      onMouseUp={handleMouseUp}
-                      onMouseLeave={handleMouseUp}
+                  <div
+                    className="relative"
+                    style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center', transition: dragState ? 'none' : 'transform 0.2s' }}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                  >
+                    <PdfDocument
+                      file={pdfBlob || document?.fileUrl || document?.cloudinaryUrl || null}
+                      onLoadSuccess={onDocumentLoadSuccess}
+                      onLoadError={console.error}
+                      loading={<div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />}
                     >
-                      {/* Document content placeholder */}
-                      <div className="text-center space-y-4 pointer-events-none">
-                        <FileText className="mx-auto text-text-muted" size={48} />
-                        <div>
-                          <p className="font-semibold text-text-primary">{document.title || document.name}</p>
-                          <p className="text-sm text-text-secondary mt-2">Page {currentPage} of {numPages}</p>
-                        </div>
+                      <div onClick={handlePageClick} className="relative shadow-lg">
+                        <Page
+                          pageNumber={currentPage}
+                          renderTextLayer={false}
+                          renderAnnotationLayer={false}
+                        />
+                        {/* Render signature field overlays */}
+                        {fieldsOnCurrentPage.map((field) => (
+                          <div
+                            key={field.id}
+                            onMouseDown={(e) => handleMouseDown(e, field.id)}
+                            onClick={(e) => { e.stopPropagation(); setSelectedField(field); }}
+                            className={`absolute border-2 flex items-center justify-center cursor-move font-medium text-sm transition-colors duration-200 ${field.isSigned ? 'border-green-400 bg-green-100/50' :
+                                selectedField?.id === field.id ? 'border-primary bg-info-light border-dashed' : 'border-warning bg-warning-light hover:border-warning border-dashed'
+                              }`}
+                            style={{ left: `${field.x}%`, top: `${field.y}%`, width: `${field.width}px`, height: `${field.height}px` }}
+                          >
+                            {field.isSigned && field.signatureData ? (
+                              <img src={field.signatureData} alt="Signed" className="w-full h-full object-contain" />
+                            ) : (
+                              <span className="text-warning text-xs select-none pointer-events-none whitespace-nowrap">[ Sign Here ]</span>
+                            )}
+                          </div>
+                        ))}
                       </div>
-
-                      {/* Render signature field overlays */}
-                      {fieldsOnCurrentPage.map((field) => (
-                        <div
-                          key={field.id}
-                          onMouseDown={(e) => handleMouseDown(e, field.id)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedField(field);
-                          }}
-                          className={`absolute border-2 border-dashed flex items-center justify-center cursor-move font-medium text-sm transition-colors duration-200 ${
-                            selectedField?.id === field.id
-                              ? 'border-primary bg-info-light'
-                              : 'border-warning bg-warning-light hover:border-warning'
-                          }`}
-                          style={{
-                            left: `${field.x}%`,
-                            top: `${field.y}%`,
-                            width: `${field.width}px`,
-                            height: `${field.height}px`,
-                          }}
-                        >
-                          <span className="text-warning text-xs select-none pointer-events-none whitespace-nowrap">[ Sign Here ]</span>
-                        </div>
-                      ))}
-                    </div>
+                    </PdfDocument>
                   </div>
                 </div>
 
@@ -342,8 +370,8 @@ const DocumentDetail: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(Math.min(currentPage + 1, numPages))}
-                    disabled={currentPage === numPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, numPages))}
+                    disabled={currentPage >= numPages || numPages === 0}
                   >
                     <ChevronRight size={18} />
                   </Button>
@@ -360,18 +388,24 @@ const DocumentDetail: React.FC = () => {
                 <CardTitle className="text-lg">Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button 
-                  variant="primary" 
-                  fullWidth 
-                  onClick={handleSaveFields}
-                  disabled={isSaving}
+                <Button
+                  variant="primary"
+                  fullWidth
+                  onClick={handleSaveCoordinates}
+                  isLoading={isSaving}
+                  disabled={isSaving || isSending}
                   className="flex items-center justify-center gap-2"
                 >
                   <Save size={18} />
                   {isSaving ? 'Saving...' : 'Save Coordinates'}
                 </Button>
-                <Button variant="outline" fullWidth onClick={() => navigate("/documents/" + (document._id || documentId) + "/send")}>
-                  Send for Signing
+                <Button
+                  variant="outline"
+                  fullWidth
+                  onClick={handleSendForSigning}
+                  isLoading={isSending}
+                  disabled={isSaving || isSending}>
+                  {isSending ? 'Saving...' : 'Save & Send for Signing'}
                 </Button>
               </CardContent>
             </Card>
@@ -392,11 +426,10 @@ const DocumentDetail: React.FC = () => {
                     {fieldsOnCurrentPage.map((field, index) => (
                       <div
                         key={field.id}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                          selectedField?.id === field.id
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${selectedField?.id === field.id
                             ? 'border-primary bg-info-light'
                             : 'border-border hover:border-primary'
-                        }`}
+                          }`}
                         onClick={() => setSelectedField(field)}
                       >
                         <div className="flex justify-between items-start">

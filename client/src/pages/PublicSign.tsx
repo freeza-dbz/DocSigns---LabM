@@ -5,6 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import Button from '@/components/common/Button';
 import { FileText, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import Swal from 'sweetalert2';
+import SignaturePadModal from '../components/SignaturePadModal';
+import { Document as PdfDocument, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
 interface SignRequestData {
   documentTitle: string;
@@ -22,6 +28,8 @@ const PublicSign: React.FC = () => {
   const [requestData, setRequestData] = useState<SignRequestData | null>(null);
   const [isSigning, setIsSigning] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+  const [numPages, setNumPages] = useState(0);
 
   useEffect(() => {
     const loadRequest = async () => {
@@ -59,29 +67,31 @@ const PublicSign: React.FC = () => {
     loadRequest();
   }, [token]);
 
-  const getIframeSrc = (baseUrl: string): string => {
-    const [path] = baseUrl.split('#');
-    return `${path}#toolbar=0`;
+  const onDocumentLoadSuccess = ({ numPages: nextNumPages }: { numPages: number }) => {
+    setNumPages(nextNumPages);
+  };
+  const handleOpenSignatureModal = () => {
+    setIsSignatureModalOpen(true);
   };
 
-  const handleSign = async () => {
-    if (!token) return;
+  const handleSaveSignature = async (signatureData: string) => {
+    setIsSignatureModalOpen(false);
+    if (!token || !requestData?.fields || requestData.fields.length === 0) return;
 
+    setIsSigning(true);
     try {
-      setIsSigning(true);
-      
-      const fieldId = requestData?.fields && requestData.fields.length > 0 
-        ? requestData.fields[0]._id 
-        : 'dummy_field_id';
-        
-      await signatureApi.submitSignature(token, fieldId, 'Signature Data', 'DRAW');
-      
+      const signaturePromises = requestData.fields
+        .filter(field => !field.isSigned)
+        .map(field => signatureApi.submitSignature(token, field._id, signatureData, 'DRAW'));
+
+      await Promise.all(signaturePromises);
+
       setIsCompleted(true);
       Swal.fire({
         icon: 'success',
         title: 'Document Signed!',
         text: 'You have successfully signed the document.',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#2563eb',
       });
     } catch (err: any) {
       Swal.fire({
@@ -136,6 +146,12 @@ const PublicSign: React.FC = () => {
   }
 
   return (
+    <>
+      <SignaturePadModal
+        isOpen={isSignatureModalOpen}
+        onClose={() => setIsSignatureModalOpen(false)}
+        onSave={handleSaveSignature}
+      />
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Document Info and Actions */}
@@ -172,7 +188,7 @@ const PublicSign: React.FC = () => {
                   variant="primary" 
                   fullWidth 
                   size="lg"
-                  onClick={handleSign}
+                  onClick={handleOpenSignatureModal}
                   isLoading={isSigning}
                   disabled={isSigning}
                 >
@@ -185,18 +201,24 @@ const PublicSign: React.FC = () => {
 
         {/* Document Preview */}
         <div className="lg:col-span-2">
-          <Card className="h-[80vh] overflow-hidden flex flex-col">
-             <CardContent className="flex-1 p-0 bg-gray-100">
-                <iframe 
-                  src={getIframeSrc(requestData.fileUrl)}
-                  className="w-full h-full border-none"
-                  title="Document Preview"
-                />
+          <Card className="h-[80vh] overflow-auto flex flex-col">
+             <CardContent className="flex-1 p-2 md:p-4 bg-gray-100 flex justify-center">
+                <PdfDocument
+                  file={requestData.fileUrl || null}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={console.error}
+                  loading={<div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />}
+                >
+                  {Array.from(new Array(numPages), (el, index) => (
+                    <Page key={`page_${index + 1}`} pageNumber={index + 1} className="mb-4 shadow-md" renderTextLayer={false} />
+                  ))}
+                </PdfDocument>
              </CardContent>
           </Card>
         </div>
       </div>
     </div>
+    </>
   );
 };
 

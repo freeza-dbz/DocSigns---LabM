@@ -78,7 +78,7 @@ const createSignatureRequest = asyncHandler(async (req, res) => {
         details: { signerEmail, message }
     });
 
-    console.log("[EMAIL MOCK] Sent to: " + signerEmail + " Link: http://localhost:5173/sign/" + token);
+    console.log("---------[EMAIL MOCK] Sent to: " + signerEmail + " Link: http://localhost:8080/sign/   -------------" + token);
 
     return res.status(201).json(new ApiResponse(201, request, "Signature request sent successfully"));
 });
