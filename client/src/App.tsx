@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import DocumentUpload from "./pages/DocumentUpload";
 import DocumentDetail from "./pages/DocumentDetail";
 import SendDocument from "./pages/SendDocument";
+import PublicSign from "./pages/PublicSign";
 import AuditTrail from "./pages/AuditTrail";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -92,7 +93,7 @@ const App = () => (
                 />
                 <Route
                   path="/sign/:token"
-                  element={<Placeholder title="Sign Document" message="Public signing page coming soon" />}
+                  element={<PublicSign />}
                 />
 
                 {/* 404 */}
