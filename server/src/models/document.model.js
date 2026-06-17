@@ -34,6 +34,10 @@ const documentSchema = new Schema(
             type: String,
             required: [true, "Cloudinary URL is required"],
         },
+        signedFileUrl: {
+            type: String,
+            default: null,
+        },
         fileSize: {
             type: Number,
             required: [true, "File size is required"],
@@ -76,4 +80,3 @@ documentSchema.index({ uploadedBy: 1, isDeleted: 1, createdAt: -1 });
 documentSchema.index({ uploadedBy: 1, status: 1, isDeleted: 1 });
 
 export const Document = mongoose.model("Document", documentSchema);
-

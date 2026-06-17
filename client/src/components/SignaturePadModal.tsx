@@ -32,8 +32,6 @@ const SignaturePadModal: React.FC<SignaturePadModalProps> = ({ isOpen, onClose, 
       canvas.height = 150;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'black';
         let fontStyle = '48px';
         if (font === 'font-cursive') fontStyle += ' "Great Vibes", cursive';

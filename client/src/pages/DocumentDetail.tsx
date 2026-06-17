@@ -320,7 +320,7 @@ const DocumentDetail: React.FC = () => {
                     onMouseLeave={handleMouseUp}
                   >
                     <PdfDocument
-                      file={pdfBlob || document?.fileUrl || document?.cloudinaryUrl || null}
+                      file={pdfBlob || document?.signedFileUrl || document?.cloudinaryUrl || null} // Prioritize signed URL
                       onLoadSuccess={onDocumentLoadSuccess}
                       onLoadError={console.error}
                       loading={<div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />}

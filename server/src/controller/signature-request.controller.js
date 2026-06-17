@@ -3,7 +3,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiErrors.js";
 import { SignatureField } from "../models/signature.model.js";
 import { SignatureRequest, SignatureRequestStatus } from "../models/signature-request.model.js";
-import { AuditLog, AuditEventType } from "../models/audit-log.model.js";
+import { AuditLog, AuditEventType, AuditLogPerformerType } from "../models/audit-log.model.js";
 import { Document, DocumentStatus } from "../models/document.model.js";
 import { embedSignaturesToPDF } from "../utils/pdfGenerator.js";
 import { uploadOnCloudinary } from "../utils/Cloudinary.js";
@@ -12,37 +12,6 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import os from "os";
-
-const saveSignatureFields = asyncHandler(async (req, res) => {
-    const { documentId } = req.params;
-    const { signatureFields } = req.body;
-    
-    if (!documentId) throw new ApiError(400, "Document ID is required");
-    if (!mongoose.isValidObjectId(documentId)) throw new ApiError(400, "Invalid Document ID format");
-    if (!Array.isArray(signatureFields)) throw new ApiError(400, "signatureFields must be an array");
-
-    await SignatureField.deleteMany({ documentId, isSigned: false }); 
-    
-    const fieldsToInsert = signatureFields.map(field => ({
-        ...field,
-        documentId
-    }));
-    
-    const savedFields = await SignatureField.insertMany(fieldsToInsert);
-
-    return res.status(200).json(
-        new ApiResponse(200, savedFields, "Signature fields saved successfully")
-    );
-});
-
-const getSignatureFields = asyncHandler(async (req, res) => {
-    const { documentId } = req.params;
-    if (!documentId) throw new ApiError(400, "Document ID is required");
-    if (!mongoose.isValidObjectId(documentId)) throw new ApiError(400, "Invalid Document ID format");
-
-    const fields = await SignatureField.find({ documentId });
-    return res.status(200).json(new ApiResponse(200, fields, "Signature fields retrieved successfully"));
-});
 
 const createSignatureRequest = asyncHandler(async (req, res) => {
     const { documentId } = req.params;
@@ -53,8 +22,8 @@ const createSignatureRequest = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Missing required fields");
     }
 
-    const document = await Document.findById(documentId);
-    if (!document) throw new ApiError(404, "Document not found");
+    const document = await Document.findOne({ _id: documentId, uploadedBy: userId });
+    if (!document) throw new ApiError(404, "Document not found or you don't have permission.");
 
     const token = crypto.randomBytes(32).toString('hex');
 
@@ -73,11 +42,12 @@ const createSignatureRequest = asyncHandler(async (req, res) => {
     await AuditLog.create({
         documentId,
         eventType: AuditEventType.SENT,
-        user: userId,
+        performerType: AuditLogPerformerType.USER, user: userId,
         ipAddress: req.ip,
         details: { signerEmail, message }
     });
 
+    // TODO: Replace console.log with a proper email sending service
     console.log("---------[EMAIL MOCK] Sent to: " + signerEmail + " Link: http://localhost:8080/sign/   -------------" + token);
 
     return res.status(201).json(new ApiResponse(201, request, "Signature request sent successfully"));
@@ -85,6 +55,12 @@ const createSignatureRequest = asyncHandler(async (req, res) => {
 
 const getSignatureRequests = asyncHandler(async (req, res) => {
     const { documentId } = req.params;
+    const userId = req.user._id;
+
+    // Verify user owns the document
+    const document = await Document.findOne({ _id: documentId, uploadedBy: userId });
+    if (!document) throw new ApiError(404, "Document not found or you don't have permission.");
+
     const requests = await SignatureRequest.find({ documentId });
     return res.status(200).json(new ApiResponse(200, requests, "Requests retrieved"));
 });
@@ -107,13 +83,13 @@ const getPublicSignatureRequest = asyncHandler(async (req, res) => {
         
         await AuditLog.create({
             documentId: request.documentId._id,
-            eventType: AuditEventType.VIEWED,
-            signerEmail: request.signerEmail,
+            eventType: AuditEventType.VIEWED, performerType: AuditLogPerformerType.SIGNER,
+            signerEmail: request.signerEmail, details: { signerName: request.signerName },
             ipAddress: req.ip
         });
         
         const doc = await Document.findById(request.documentId._id);
-        if (doc && (doc.status === DocumentStatus.DRAFT || doc.status === DocumentStatus.SENT)) {
+        if (doc && (doc.status === DocumentStatus.DRAFT || doc.status === DocumentStatus.SENT || doc.status === DocumentStatus.VIEWED)) {
             doc.status = DocumentStatus.VIEWED;
             await doc.save();
         }
@@ -139,7 +115,7 @@ const submitSignature = asyncHandler(async (req, res) => {
     }
 
     field.isSigned = true;
-    field.signatureData = signatureData;
+    field.signatureData = signatureData; // Save the base64 signature data
     field.signatureMethod = signatureMethod || 'DRAW';
     field.signatureRequestId = request._id;
     await field.save();
@@ -156,35 +132,37 @@ const submitSignature = asyncHandler(async (req, res) => {
         const doc = await Document.findById(request.documentId._id);
         doc.status = DocumentStatus.SIGNED;
 
+        // Embed signatures into the PDF
         try {
             const pdfBytes = await embedSignaturesToPDF(doc.cloudinaryUrl, allFields);
             
             const tempFilePath = path.join(os.tmpdir(), "signed_" + doc._id + ".pdf");
             fs.writeFileSync(tempFilePath, pdfBytes);
             
-            const cloudinaryResponse = await uploadOnCloudinary(tempFilePath);
+            const cloudinaryResponse = await uploadOnCloudinary(tempFilePath, "signed_documents"); // Specify a folder for signed documents
             if (cloudinaryResponse) {
-                doc.cloudinaryUrl = cloudinaryResponse.secure_url || cloudinaryResponse.url;
+                doc.signedFileUrl = cloudinaryResponse.secure_url || cloudinaryResponse.url;
                 doc.cloudinaryPublicId = cloudinaryResponse.public_id;
                 doc.status = DocumentStatus.COMPLETED;
             }
             fs.unlinkSync(tempFilePath); 
         } catch (error) {
             console.error("PDF generation failed:", error);
+            // Potentially add an audit log for failure or handle error more gracefully
         }
 
         await doc.save();
 
         await AuditLog.create({
             documentId: request.documentId._id,
-            eventType: AuditEventType.COMPLETED,
-            signerEmail: request.signerEmail,
+            eventType: AuditEventType.COMPLETED, performerType: AuditLogPerformerType.SIGNER,
+            signerEmail: request.signerEmail, details: { signerName: request.signerName },
             ipAddress: req.ip
         });
     } else {
         await AuditLog.create({
             documentId: request.documentId._id,
-            eventType: AuditEventType.SIGNED,
+            eventType: AuditEventType.SIGNED, performerType: AuditLogPerformerType.SIGNER,
             signerEmail: request.signerEmail,
             ipAddress: req.ip,
             details: { fieldId }
@@ -195,8 +173,6 @@ const submitSignature = asyncHandler(async (req, res) => {
 });
 
 export {
-    saveSignatureFields,
-    getSignatureFields,
     createSignatureRequest,
     getSignatureRequests,
     getPublicSignatureRequest,

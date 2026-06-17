@@ -10,6 +10,11 @@ export const AuditEventType = {
     DOWNLOADED: "DOWNLOADED"
 };
 
+export const AuditLogPerformerType = {
+    USER: "USER",
+    SIGNER: "SIGNER",
+};
+
 const auditLogSchema = new Schema(
     {
         documentId: {
@@ -21,6 +26,11 @@ const auditLogSchema = new Schema(
         eventType: {
             type: String,
             enum: Object.values(AuditEventType),
+            required: true,
+        },
+        performerType: {
+            type: String,
+            enum: Object.values(AuditLogPerformerType),
             required: true,
         },
         user: {

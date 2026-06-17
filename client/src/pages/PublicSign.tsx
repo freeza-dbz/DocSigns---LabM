@@ -49,8 +49,8 @@ const PublicSign: React.FC = () => {
         if (data && data.document) {
           setRequestData({
             documentTitle: data.document.title || 'Document',
-            ownerName: 'Sender', 
-            fileUrl: data.document.cloudinaryUrl,
+            ownerName: 'Sender',
+            fileUrl: data.document.signedFileUrl || data.document.cloudinaryUrl, // Prioritize signed URL
             fields: data.fields || []
           });
         } else {
