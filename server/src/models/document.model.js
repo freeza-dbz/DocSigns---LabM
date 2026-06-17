@@ -4,7 +4,6 @@ export const DocumentStatus = {
     DRAFT: "DRAFT",
     SENT: "SENT",
     VIEWED: "VIEWED",
-    PENDING: "PENDING",
     SIGNED: "SIGNED",
     COMPLETED: "COMPLETED",
     REJECTED: "REJECTED",

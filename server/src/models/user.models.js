@@ -34,11 +34,11 @@ const userSchema = new mongoose.Schema({
     isAdmin: {
         type: Boolean,
         default: false
-    }
-}, { timestamps: true }
-    , {
-        versionKey: false
-    });
+    },
+}, {
+    timestamps: true,
+    versionKey: false
+});
 
 userSchema.pre("save", async function () {
     if (!this.isModified("password")) return;

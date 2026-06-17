@@ -3,11 +3,13 @@ import mongoose, { Schema } from "mongoose";
 export const AuditEventType = {
     UPLOADED: "UPLOADED",
     SENT: "SENT",
+    UPDATED: "UPDATED",
     VIEWED: "VIEWED",
     SIGNED: "SIGNED",
     COMPLETED: "COMPLETED",
     DECLINED: "DECLINED",
-    DOWNLOADED: "DOWNLOADED"
+    DOWNLOADED: "DOWNLOADED",
+    REMINDER_SENT: "REMINDER_SENT"
 };
 
 export const AuditLogPerformerType = {

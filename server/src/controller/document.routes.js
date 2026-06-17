@@ -12,7 +12,7 @@ import {
     downloadSignedDocument
 } from "../controller/document.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
-import { upload } from "../middleware/multer.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 

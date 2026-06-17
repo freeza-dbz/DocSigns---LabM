@@ -6,6 +6,7 @@ import { SignatureRequest, SignatureRequestStatus } from "../models/signature-re
 import { AuditLog, AuditEventType, AuditLogPerformerType } from "../models/audit-log.model.js";
 import { Document, DocumentStatus } from "../models/document.model.js";
 import { embedSignaturesToPDF } from "../utils/pdfGenerator.js";
+import { mailSender } from "../utils/mailSender.js";
 import { uploadOnCloudinary } from "../utils/Cloudinary.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
@@ -47,9 +48,27 @@ const createSignatureRequest = asyncHandler(async (req, res) => {
         details: { signerEmail, message }
     });
 
-    // TODO: Replace console.log with a proper email sending service
-    console.log("---------[EMAIL MOCK] Sent to: " + signerEmail + " Link: http://localhost:8080/sign/   -------------" + token);
+    // Send signature request email
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const signUrl = `${clientUrl}/sign/${token}`;
 
+    const emailTitle = `Signature Request: ${document.title}`;
+    const emailBody = `
+        <p>Hello ${signerName},</p>
+        <p>You have been requested by ${req.user.fullName} to sign the document "${document.title}".</p>
+        ${message ? `<p><strong>Message:</strong> ${message}</p>` : ''}
+        <p>Please click the link below to review and sign the document.</p>
+        <p><a href="${signUrl}" style="padding: 10px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Sign Document</a></p>
+        <p>This link will expire on ${new Date(expirationDate).toLocaleString()}.</p>
+        <p>Thank you.</p>
+    `;
+
+    try {
+        await mailSender(signerEmail, emailTitle, emailBody);
+    } catch (error) {
+        console.error(`Failed to send signature request email to ${signerEmail}`, error);
+    }
+    
     return res.status(201).json(new ApiResponse(201, request, "Signature request sent successfully"));
 });
 
@@ -172,9 +191,68 @@ const submitSignature = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, field, "Signature submitted successfully"));
 });
 
+const sendReminder = asyncHandler(async (req, res) => {
+    const { requestId } = req.params;
+    const userId = req.user._id;
+
+    if (!requestId || !mongoose.isValidObjectId(requestId)) {
+        throw new ApiError(400, "Valid Request ID is required");
+    }
+
+    const request = await SignatureRequest.findById(requestId).populate('documentId');
+    if (!request) {
+        throw new ApiError(404, "Signature request not found.");
+    }
+
+    // Authorize: ensure the user sending the reminder owns the document
+    if (request.documentId.uploadedBy.toString() !== userId.toString()) {
+        throw new ApiError(403, "You do not have permission to send a reminder for this request.");
+    }
+
+    // Check status
+    if (request.status !== SignatureRequestStatus.PENDING && request.status !== SignatureRequestStatus.VIEWED) {
+        throw new ApiError(400, `Cannot send reminder for a request with status: ${request.status}`);
+    }
+
+    // Check expiration
+    if (new Date() > new Date(request.expirationDate)) {
+        throw new ApiError(400, "Cannot send reminder for an expired request.");
+    }
+
+    // Send reminder email
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const signUrl = `${clientUrl}/sign/${request.token}`;
+
+    const emailTitle = `Reminder: Signature Request for ${request.documentId.title}`;
+    const emailBody = `
+        <p>Hello ${request.signerName},</p>
+        <p>This is a friendly reminder to sign the document "${request.documentId.title}".</p>
+        <p>Please click the link below to review and sign the document.</p>
+        <p><a href="${signUrl}" style="padding: 10px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Sign Document</a></p>
+        <p>This link will expire on ${new Date(request.expirationDate).toLocaleString()}.</p>
+        <p>Thank you.</p>
+    `;
+
+    await mailSender(request.signerEmail, emailTitle, emailBody);
+    
+    await AuditLog.create({
+        documentId: request.documentId._id,
+        eventType: AuditEventType.REMINDER_SENT,
+        performerType: AuditLogPerformerType.USER,
+        user: userId,
+        ipAddress: req.ip,
+        details: {
+            signerEmail: request.signerEmail
+        }
+    });
+
+    return res.status(200).json(new ApiResponse(200, {}, "Reminder sent successfully."));
+});
+
 export {
     createSignatureRequest,
     getSignatureRequests,
     getPublicSignatureRequest,
-    submitSignature
+    submitSignature,
+    sendReminder
 };

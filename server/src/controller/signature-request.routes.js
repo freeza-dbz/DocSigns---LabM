@@ -3,7 +3,8 @@ import {
     createSignatureRequest, 
     getSignatureRequests, 
     getPublicSignatureRequest, 
-    submitSignature 
+    submitSignature,
+    sendReminder
 } from "../controller/signature-request.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
@@ -19,5 +20,7 @@ router.use(verifyJWT);
 router.route("/:documentId")
     .post(createSignatureRequest)
     .get(getSignatureRequests);
+
+router.route("/reminder/:requestId").post(sendReminder);
 
 export default router;

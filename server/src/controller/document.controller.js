@@ -131,23 +131,39 @@ const updateDocument = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const { documentId } = req.params;
     const { title } = req.body;
-    
+
     if (!documentId) {
         throw new ApiError(400, "Document ID is required");
     }
     if (!mongoose.isValidObjectId(documentId)) {
         throw new ApiError(400, "Invalid Document ID format");
     }
+    if (!title || title.trim() === "") {
+        throw new ApiError(400, "Title is required for an update.");
+    }
 
-    const document = await Document.findOneAndUpdate(
-        { _id: documentId, uploadedBy: userId, isDeleted: false },
-        { $set: { title } },
-        { new: true }
-    );
+    const document = await Document.findOne({ _id: documentId, uploadedBy: userId, isDeleted: false });
 
     if (!document) {
-        throw new ApiError(404, "Document not found");
+        throw new ApiError(404, "Document not found or you don't have permission to edit it.");
     }
+
+    const oldTitle = document.title;
+    document.title = title;
+    await document.save({ validateBeforeSave: false });
+
+    await AuditLog.create({
+        documentId: document._id,
+        eventType: AuditEventType.UPDATED,
+        performerType: AuditLogPerformerType.USER,
+        user: userId,
+        ipAddress: req.ip,
+        details: {
+            field: 'title',
+            oldValue: oldTitle,
+            newValue: title,
+        }
+    });
 
     return res.status(200).json(
         new ApiResponse(200, document, "Document updated successfully")

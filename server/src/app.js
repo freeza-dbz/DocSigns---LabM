@@ -15,11 +15,11 @@ app.use(express.static("public"));
 app.use(cookieParser());
 
 // Routes import
-import userRouter from "./controller/user.routes.js";
-import documentRouter from "./controller/document.routes.js";
-import auditRouter from "./controller/audit.routes.js";
-import signatureFieldRouter from "./controller/signature-field.routes.js";
-import signatureRequestRouter from "./controller/signature-request.routes.js";
+import userRouter from "./routes/user.routes.js";
+import documentRouter from "./routes/document.routes.js";
+import auditRouter from "./routes/audit.routes.js";
+import signatureFieldRouter from "./routes/signature-field.routes.js";
+import signatureRequestRouter from "./routes/signature-request.routes.js";
 
 // Routes declaration
 app.use("/api/v1/users", userRouter);
