@@ -1,42 +1,38 @@
 import { Router } from "express";
-import { verifyJWT } from "../middleware/auth.middleware.js";
-import { upload } from "../middleware/multer.middleware.js";
-
 import {
-  uploadDocument,
-  getUserDocuments,
-  getDocumentById,
-  getDocumentPreview,
-  updateDocument,
-  deleteDocument,
-  getDocumentStats,
-  updateDocumentStatus,
-  searchDocuments,
-  getDocumentAuditLogs,
-  
+    uploadDocument,
+    getUserDocuments,
+    getDocumentById,
+    getDocumentPreview,
+    updateDocument,
+    deleteDocument,
+    getDocumentStats,
+    updateDocumentStatus,
+    searchDocuments,
+    downloadSignedDocument
 } from "../controller/document.controller.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
-// Protect all document routes
+// All routes here require authentication
 router.use(verifyJWT);
 
-// Static routes first
-router.post("/upload", upload.single("file"), uploadDocument);
-router.get("/", getUserDocuments);
-router.get("/stats", getDocumentStats);
-router.get("/search", searchDocuments);
+router.route("/")
+    .post(upload.single("document"), uploadDocument)
+    .get(getUserDocuments);
 
-// Routes with additional segments BEFORE parameterized routes
-router.get("/:documentId/preview", getDocumentPreview);
-router.get("/:documentId/audit-logs", getDocumentAuditLogs);
-router.patch("/:documentId/status", updateDocumentStatus);
+router.route("/stats").get(getDocumentStats);
+router.route("/search").get(searchDocuments);
 
+router.route("/:documentId")
+    .get(getDocumentById)
+    .patch(updateDocument)
+    .delete(deleteDocument);
 
-// Parameterized routes LAST (most generic)
-router.get("/:documentId", getDocumentById);
-router.patch("/:documentId", updateDocument);
-router.delete("/:documentId", deleteDocument);
+router.route("/:documentId/preview").get(getDocumentPreview);
+router.route("/:documentId/status").patch(updateDocumentStatus);
+router.route("/:documentId/download/signed").get(downloadSignedDocument);
 
 export default router;
-

@@ -108,8 +108,21 @@ const getDocumentPreview = asyncHandler(async (req, res) => {
 
     const document = await Document.findOne({ _id: documentId, uploadedBy: userId, isDeleted: false });
     if (!document) {
-        throw new ApiError(404, "Document not found");
+        throw new ApiError(404, "Document not found or you don't have permission to view it.");
     }
+
+    // Log the download/preview action
+    await AuditLog.create({
+        documentId: document._id,
+        eventType: AuditEventType.DOWNLOADED,
+        performerType: AuditLogPerformerType.USER,
+        user: userId,
+        ipAddress: req.ip,
+        details: {
+            fileName: document.originalFileName,
+            version: 'original'
+        }
+    });
 
     return res.redirect(document.cloudinaryUrl);
 });
@@ -246,6 +259,40 @@ const searchDocuments = asyncHandler(async (req, res) => {
     );
 });
 
+const downloadSignedDocument = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { documentId } = req.params;
+
+    if (!documentId) {
+        throw new ApiError(400, "Document ID is required");
+    }
+    if (!mongoose.isValidObjectId(documentId)) {
+        throw new ApiError(400, "Invalid Document ID format");
+    }
+
+    const document = await Document.findOne({ _id: documentId, uploadedBy: userId, isDeleted: false });
+    if (!document) {
+        throw new ApiError(404, "Document not found or you don't have permission to view it.");
+    }
+
+    if (!document.signedFileUrl) {
+        throw new ApiError(404, "Signed document is not available for download.");
+    }
+
+    await AuditLog.create({
+        documentId: document._id,
+        eventType: AuditEventType.DOWNLOADED,
+        performerType: AuditLogPerformerType.USER,
+        user: userId,
+        ipAddress: req.ip,
+        details: {
+            fileName: `signed_${document.originalFileName}`,
+            version: 'completed'
+        }
+    });
+
+    return res.redirect(document.signedFileUrl);
+});
 
 export {
     uploadDocument,
@@ -256,5 +303,6 @@ export {
     deleteDocument,
     getDocumentStats,
     updateDocumentStatus,
-    searchDocuments
+    searchDocuments,
+    downloadSignedDocument
 };
