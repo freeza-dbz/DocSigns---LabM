@@ -19,10 +19,8 @@ const router = Router();
 // All routes here require authentication
 router.use(verifyJWT);
 
-router.route("/upload")
-    .post(upload.single("file"), uploadDocument);
-
 router.route("/")
+    .post(upload.single("document"), uploadDocument)
     .get(getUserDocuments);
 
 router.route("/stats").get(getDocumentStats);

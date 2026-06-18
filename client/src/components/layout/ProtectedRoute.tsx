@@ -9,6 +9,8 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
+  console.log('ProtectedRoute: isAuthenticated', isAuthenticated, 'isLoading', isLoading);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">

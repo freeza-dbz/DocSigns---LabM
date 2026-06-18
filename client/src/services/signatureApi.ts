@@ -5,7 +5,7 @@ export const signatureApi = {
   // Save all signature fields for a document
   saveSignatureFields: async (documentId: string, signatureFields: any[]) => {
     try {
-      const response = await apiClient.post('/v1/signatures/' + documentId + '/fields', { signatureFields });
+      const response = await apiClient.post('/v1/signature-fields/' + documentId, { signatureFields });
       return response.data;
     } catch (error) {
       throw error;
@@ -15,7 +15,7 @@ export const signatureApi = {
   // Get signature fields for document
   getSignatureFields: async (documentId: string) => {
     try {
-      const response = await apiClient.get('/v1/signatures/' + documentId + '/fields');
+      const response = await apiClient.get('/v1/signature-fields/' + documentId);
       return response.data;
     } catch (error) {
       throw error;
@@ -25,7 +25,7 @@ export const signatureApi = {
   // Create signature request
   createSignatureRequest: async (documentId: string, request: Omit<SignatureRequest, 'id' | 'createdAt'>) => {
     try {
-      const response = await apiClient.post('/v1/signatures/' + documentId + '/requests', request);
+      const response = await apiClient.post('/v1/signature-requests/' + documentId, request);
       return response.data;
     } catch (error) {
       throw error;
@@ -35,7 +35,7 @@ export const signatureApi = {
   // Get signature requests
   getSignatureRequests: async (documentId: string) => {
     try {
-      const response = await apiClient.get('/v1/signatures/' + documentId + '/requests');
+      const response = await apiClient.get('/v1/signature-requests/' + documentId);
       return response.data;
     } catch (error) {
       throw error;
@@ -45,7 +45,7 @@ export const signatureApi = {
   // Get public signature request
   getPublicSignatureRequest: async (token: string) => {
     try {
-      const response = await apiClient.get('/v1/signatures/public/' + token);
+      const response = await apiClient.get('/v1/signature-requests/public/' + token);
       return response.data;
     } catch (error) {
       throw error;
@@ -60,7 +60,7 @@ export const signatureApi = {
     signatureMethod: string = 'DRAW'
   ) => {
     try {
-      const response = await apiClient.post('/v1/signatures/public/' + token + '/submit', {
+      const response = await apiClient.post('/v1/signature-requests/submit/' + token, {
         fieldId,
         signatureData,
         signatureMethod

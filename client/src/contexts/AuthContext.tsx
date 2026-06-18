@@ -17,22 +17,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // In a real app, send token to backend for verification
+        // For now, assume token is valid if it exists
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+          return true; // Indicate successful authentication
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check authentication:', error);
+    }
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return false; // Indicate failed authentication
+  };
+
   useEffect(() => {
     const initAuth = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          // Mock: In real app, verify token with backend
-          const storedUser = localStorage.getItem('user');
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          }
-        }
-      } catch (error) {
-        console.error('Auth init failed:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      setIsLoading(true);
+      await checkAuth(); // Use the new checkAuth function
+      setIsLoading(false);
     };
 
     initAuth();

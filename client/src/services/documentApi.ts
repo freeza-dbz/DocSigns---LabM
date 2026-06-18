@@ -43,7 +43,14 @@ export const documentApi = {
   // Upload document
   uploadDocument: async (file: File, documentName: string) => {
     try {
-      const response = await apiClient.postForm('/v1/documents/upload', { file, documentName });
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('documentName', documentName);
+      const response = await apiClient.post('/v1/documents', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
       return response.data;
     } catch (error) {
@@ -95,6 +102,17 @@ export const documentApi = {
   updateDocumentStatus: async (documentId: string, status: string) => {
     try {
       const response = await apiClient.patch('/v1/documents/' + documentId + '/status', { status });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  downloadSignedDocument: async (documentId: string) => {
+    try {
+      const response = await apiClient.get('/v1/documents/' + documentId + '/download/signed', {
+        responseType: 'blob'
+      });
       return response.data;
     } catch (error) {
       throw error;

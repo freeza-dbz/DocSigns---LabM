@@ -17,6 +17,9 @@ const uploadDocument = asyncHandler(async (req, res) => {
 
     try {
         const cloudinaryResponse = await uploadOnCloudinary(req.file.path);
+        if (!cloudinaryResponse) {
+            throw new ApiError(500, "Failed to upload file to Cloudinary");
+        }
 
         const document = await Document.create({
             title,
@@ -44,24 +47,45 @@ const uploadDocument = asyncHandler(async (req, res) => {
             new ApiResponse(201, document, "Document uploaded successfully")
         );
     } catch (error) {
-        console.error("Error during document upload:", error);
+        if (error.message.includes("Cloudinary upload failed")) {
+            throw new ApiError(502, error.message);
+        }
         throw error;
     }
 });
 
 const getUserDocuments = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    const { page = 1, limit = 10, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+    const { page = 1, limit = 10, sortBy = "createdAt", sortOrder = "desc", search, status } = req.query;
     
     const skip = (page - 1) * limit;
     const sort = { [sortBy]: sortOrder === "desc" ? -1 : 1 };
 
-    const documents = await Document.find({ uploadedBy: userId, isDeleted: false })
+    // Build the query object
+    const query = { uploadedBy: userId, isDeleted: false };
+
+    // Filter by search query (title)
+    if (search && search.trim() !== "") {
+        query.title = { $regex: search.trim(), $options: "i" };
+    }
+
+    // Filter by status, mapping client lowercase values to database uppercase constants
+    if (status && status.trim() !== "") {
+        const uppercaseStatus = status.trim().toUpperCase();
+        if (uppercaseStatus === "PENDING") {
+            // Pending means SENT or VIEWED by the signer
+            query.status = { $in: [DocumentStatus.SENT, DocumentStatus.VIEWED] };
+        } else {
+            query.status = uppercaseStatus;
+        }
+    }
+
+    const documents = await Document.find(query)
         .sort(sort)
         .skip(skip)
         .limit(parseInt(limit));
         
-    const total = await Document.countDocuments({ uploadedBy: userId, isDeleted: false });
+    const total = await Document.countDocuments(query);
     const result = { documents, total, page: parseInt(page), limit: parseInt(limit) };
 
     return res.status(200).json(
@@ -119,7 +143,21 @@ const getDocumentPreview = asyncHandler(async (req, res) => {
         }
     });
 
-    return res.redirect(document.cloudinaryUrl);
+    try {
+        const response = await fetch(document.cloudinaryUrl);
+        if (!response.ok) {
+            throw new ApiError(500, "Failed to fetch document preview from storage");
+        }
+        res.setHeader("Content-Type", "application/pdf");
+        const contentLength = response.headers.get("content-length");
+        if (contentLength) {
+            res.setHeader("Content-Length", contentLength);
+        }
+        const buffer = Buffer.from(await response.arrayBuffer());
+        return res.send(buffer);
+    } catch (fetchError) {
+        throw new ApiError(500, `Failed to retrieve document file: ${fetchError.message}`);
+    }
 });
 
 const updateDocument = asyncHandler(async (req, res) => {

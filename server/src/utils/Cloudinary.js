@@ -1,4 +1,4 @@
-import {v2 as cloudinary} from 'cloudinary';            
+import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 
 cloudinary.config({
@@ -7,22 +7,37 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadOnCloudinary = async (filepath) =>{
-    try{
-        if(!filepath){
-            return null;
-        }else{
-            const response = await cloudinary.uploader.upload(filepath,{
-                resource_type: "auto"
-            });
-            fs.unlinkSync(filepath);// deleting localfile path as no more needed
-            // console.log("file uploaded on cloudinary", response);
-            return response;
+const uploadOnCloudinary = async (localFilePath, folderName) => {
+    try {
+        if (!localFilePath) {
+            return null
         }
+        
+        let uploadOptions = { resource_type: "auto" };
+        let finalPath = localFilePath;
+        
+        if (localFilePath.endsWith('.pdf')) {
+            uploadOptions = { resource_type: "raw" };
+            finalPath = localFilePath.replace('.pdf', '.txt');
+            fs.renameSync(localFilePath, finalPath);
+        }
+        
+        if (folderName) {
+            uploadOptions.folder = folderName;
+        }
+
+        const response = await cloudinary.uploader.upload(finalPath, uploadOptions);
+        fs.unlinkSync(finalPath);
+        return response;
     }
-    catch(error){
-        console.error("Error uploading file to Cloudinary:", error);
-        fs.unlinkSync(filepath);
+    catch (error) {
+        if (fs.existsSync(localFilePath)) {
+            fs.unlinkSync(localFilePath);
+        }
+        const finalPath = localFilePath.replace('.pdf', '.txt');
+        if (fs.existsSync(finalPath)) {
+            fs.unlinkSync(finalPath);
+        }
         return null;
     }
 }

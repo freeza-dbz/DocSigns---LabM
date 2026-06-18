@@ -5,7 +5,7 @@ export const auditApi = {
   // Get audit logs for a document
   getAuditLogs: async (documentId: string) => {
     try {
-      const response = await apiClient.get(`/v1/documents/${documentId}/audit-logs`);
+      const response = await apiClient.get(`/v1/audits/${documentId}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -15,7 +15,7 @@ export const auditApi = {
   // Get paginated audit logs
   getAuditLogsPaginated: async (documentId: string, page: number = 1, limit: number = 50) => {
     try {
-      const response = await apiClient.get(`/v1/documents/${documentId}/audit-logs`, {
+      const response = await apiClient.get(`/v1/audits/${documentId}`, {
         params: { page, limit },
       });
       return response.data;

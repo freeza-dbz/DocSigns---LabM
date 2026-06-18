@@ -5,7 +5,7 @@ import { Document, DocumentStatus } from '@/types';
 import Button from '@/components/common/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/common/Card';
 import { StatusBadge } from '@/components/common/Badge';
-import { FileText, Plus, Search, Clock, CheckCircle, Archive, History } from 'lucide-react';
+import { FileText, Plus, Search, Clock, CheckCircle, Archive, History, Trash2, Download } from 'lucide-react';
 import Input from '@/components/common/Input';
 
 const Dashboard: React.FC = () => {
@@ -40,6 +40,29 @@ const Dashboard: React.FC = () => {
     const timer = setTimeout(loadDocuments, 300);
     return () => clearTimeout(timer);
   }, [search, filterStatus, page]);
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const handleDownloadSigned = async (docId: string, docTitle: string) => {
+    try {
+      const blob = await documentApi.downloadSignedDocument(docId);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `signed_${docTitle || 'document'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download signed document:', error);
+      alert('Failed to download signed document.');
+    }
+  };
 
   const stats = [
     {
@@ -210,6 +233,26 @@ const Dashboard: React.FC = () => {
                                 <History size={16} />
                               </Button>
                             </Link>
+                            {(doc.status === 'completed' || doc.status === 'COMPLETED' || doc.status === 'signed' || doc.status === 'SIGNED') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDownloadSigned(doc._id || doc.id || '', doc.title || doc.name || '')}
+                                className="text-green-600 hover:text-green-800 hover:bg-green-50 dark:hover:bg-green-950/30"
+                                title="Download Signed PDF"
+                              >
+                                <Download size={16} />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(doc._id || doc.id || '')}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              title="Delete Document"
+                            >
+                              <Trash2 size={16} />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -221,6 +264,46 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Premium Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300">
+          <div className="bg-background-secondary border-2 border-border rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-text-primary mb-2">Delete Document</h3>
+            <p className="text-text-secondary mb-6">
+              Are you sure you want to delete this document? This action cannot be undone and will permanently remove all associated signatures and audit logs.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmId(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  const id = deleteConfirmId;
+                  setDeleteConfirmId(null);
+                  try {
+                    await documentApi.deleteDocument(id);
+                    // Remove document from local state to refresh the UI immediately
+                    setDocuments((prev) => prev.filter((doc) => (doc._id || doc.id) !== id));
+                    // Refresh statistics
+                    const statsResult = await documentApi.getDocumentStats();
+                    setDocStats(statsResult.data || { total: 0, PENDING: 0, COMPLETED: 0, DRAFT: 0 });
+                  } catch (error) {
+                    console.error('Failed to delete document:', error);
+                    alert('Failed to delete document. Please try again.');
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

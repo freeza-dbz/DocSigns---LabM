@@ -151,7 +151,7 @@ const SendDocument: React.FC = () => {
 
     try {
 
-      await documentApi.updateDocumentStatus(documentId, 'PENDING');
+      await documentApi.updateDocumentStatus(documentId, 'SENT');
 
 
       for (const signer of signers) {

@@ -264,6 +264,7 @@ const AuditTrail: React.FC = () => {
               <Button
                 variant="outline"
                 className="flex items-center gap-2"
+                onClick={() => window.print()}
               >
                 <Download size={18} />
                 Download Audit Report
