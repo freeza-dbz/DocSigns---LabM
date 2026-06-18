@@ -17,9 +17,6 @@ const uploadDocument = asyncHandler(async (req, res) => {
 
     try {
         const cloudinaryResponse = await uploadOnCloudinary(req.file.path);
-        if (!cloudinaryResponse) {
-            throw new ApiError(500, "Failed to upload file to Cloudinary");
-        }
 
         const document = await Document.create({
             title,
@@ -47,9 +44,7 @@ const uploadDocument = asyncHandler(async (req, res) => {
             new ApiResponse(201, document, "Document uploaded successfully")
         );
     } catch (error) {
-        if (error.message.includes("Cloudinary upload failed")) {
-            throw new ApiError(502, error.message);
-        }
+        console.error("Error during document upload:", error);
         throw error;
     }
 });
