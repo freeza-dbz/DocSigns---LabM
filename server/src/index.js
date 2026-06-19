@@ -2,11 +2,12 @@ import dns from "dns";
 dns.setDefaultResultOrder("ipv4first");
 
 import dotenv from "dotenv";
+import path from "path";
 import connectDB from "./db/index.js";
 import { app } from "./app.js";
 
 dotenv.config({
-    path: './.env'
+    path: path.resolve(__dirname, '..', '.env')
 });
 
 await connectDB()
