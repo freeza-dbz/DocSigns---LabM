@@ -153,7 +153,6 @@ const Login: React.FC = () => {
               type="text"
               placeholder="you@example.com"
               error={errors.email?.message}
-              // Note: The field is still registered as 'email' for react-hook-form.
               {...register('email')}
             />
 
