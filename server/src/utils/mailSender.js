@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
 
 const mailSender = async (email, title, body) => {
     // Check if SMTP environment variables are defined
@@ -31,26 +32,41 @@ const mailSender = async (email, title, body) => {
     try {
         const cleanPass = process.env.MAIL_PASS ? process.env.MAIL_PASS.replace(/\s+/g, '') : '';
         
+        // Determine port and secure setting
+        // Port 465 -> secure: true (SSL) — more reliable on cloud/Render
+        // Port 587 -> secure: false (STARTTLS)
+        const port = process.env.MAIL_PORT ? parseInt(process.env.MAIL_PORT) : 465;
+        const isSecure = process.env.MAIL_SECURE === 'true' || port === 465;
+
         const transporterConfig = {
             host: process.env.MAIL_HOST || 'smtp.gmail.com',
-            port: process.env.MAIL_PORT ? parseInt(process.env.MAIL_PORT) : 587,
-            secure: process.env.MAIL_SECURE === 'true',
+            port,
+            secure: isSecure,
             auth: {
                 user: process.env.MAIL_USER,
                 pass: cleanPass,
             },
+            // Connection timeout settings to avoid hanging on Render/cloud envs
+            connectionTimeout: 10000,  // 10 seconds
+            greetingTimeout: 10000,    // 10 seconds
+            socketTimeout: 15000,      // 15 seconds
             tls: {
                 rejectUnauthorized: false // Bypass SSL/TLS errors in cloud containers
             },
-            connectionOptions: {
-                family: 4 // Force IPv4 to avoid ENETUNREACH on Render
+            // Force IPv4 to avoid ENETUNREACH on Render (IPv6 is often blocked)
+            dnsLookup: (hostname, options, callback) => {
+                dns.lookup(hostname, { ...options, family: 4 }, callback);
             }
         };
 
         const transporter = nodemailer.createTransport(transporterConfig);
 
+        // Verify SMTP connection before sending (helps catch config issues early)
+        await transporter.verify();
+        console.log("✅ [SMTP CONNECTION VERIFIED]");
+
         const mailOptions = {
-            from: process.env.MAIL_FROM || 'DocSigns <no-reply@docsigns.com>',
+            from: process.env.MAIL_FROM || `DocSigns <${process.env.MAIL_USER}>`,
             to: email,
             subject: title,
             html: body,
