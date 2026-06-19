@@ -176,7 +176,7 @@ const DocumentUpload: React.FC = () => {
                   }`}
                 >
                   <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">
+                  <p className="text-lg font-medium text-white-900 mb-2">
                     Drag and drop your PDF here
                   </p>
                   <p className="text-gray-600 text-sm mb-4">or</p>
