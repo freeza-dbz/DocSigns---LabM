@@ -241,7 +241,7 @@ const AuditTrail: React.FC = () => {
                               </div>
                               <div className="flex items-center gap-1">
                                 <Globe size={16} />
-                                <span>{log.ipAddress}</span>
+                                <span></span>
                               </div>
                             </div>
                           </div>
