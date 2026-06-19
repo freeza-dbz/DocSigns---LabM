@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
     proxy: {
       // Proxy API requests to your own backend server during development
       "/api": {
-        target: "http://localhost:8000", // CHANGE THIS to your backend server URL
+        target: "https://docsigns-labm.onrender.com", // CHANGE THIS to your backend server URL
         changeOrigin: true,
         secure: false,
       },

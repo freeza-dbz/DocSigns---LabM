@@ -49,7 +49,7 @@ const createSignatureRequest = asyncHandler(async (req, res) => {
     });
 
     // Send signature request email
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
     const signUrl = `${clientUrl}/sign/${token}`;
 
     const emailTitle = `Signature Request: ${document.title}`;
@@ -220,7 +220,7 @@ const sendReminder = asyncHandler(async (req, res) => {
     }
 
     // Send reminder email
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
     const signUrl = `${clientUrl}/sign/${request.token}`;
 
     const emailTitle = `Reminder: Signature Request for ${request.documentId.title}`;
