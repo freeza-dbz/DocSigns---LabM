@@ -143,7 +143,7 @@ const AuditTrail: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <Button
               variant="ghost"
-              onClick={() => navigate(`/documents/${documentId}`)}
+              onClick={() => navigate(`/dashboard`)}
             >
               ← Back
             </Button>

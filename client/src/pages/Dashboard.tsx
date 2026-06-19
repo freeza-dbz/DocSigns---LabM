@@ -81,7 +81,7 @@ const Dashboard: React.FC = () => {
       title: 'Completed',
       value: (docStats.COMPLETED || 0).toString(),
       icon: CheckCircle,
-      color: 'bg-green-100 text-green-600',
+      color: 'black',
     },
     {
       title: 'Drafts',

@@ -10,7 +10,7 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 export const Badge: React.FC<BadgeProps> = ({ variant = 'default', className, children, ...props }) => {
   const variants = {
     default: 'bg-background-tertiary text-text-primary border border-border',
-    success: 'bg-success-light text-success border border-success',
+    success: 'bg-black text-white border border-black',
     warning: 'bg-warning-light text-warning border border-warning',
     danger: 'bg-danger-light text-danger border border-danger',
     info: 'bg-info-light text-info border border-info',
