@@ -149,9 +149,9 @@ const Login: React.FC = () => {
           )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Input
-              label="Email or Username"
+              label="Email"
               type="text"
-              placeholder="you@example.com or johndoe"
+              placeholder="you@example.com"
               error={errors.email?.message}
               // Note: The field is still registered as 'email' for react-hook-form.
               {...register('email')}

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { signatureApi } from '@/services/signatureApi';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/common/Card';
@@ -30,6 +30,7 @@ const PublicSign: React.FC = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
   const [numPages, setNumPages] = useState(0);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
   useEffect(() => {
     const loadRequest = async () => {
@@ -53,6 +54,13 @@ const PublicSign: React.FC = () => {
             fileUrl: data.document.signedFileUrl || data.document.cloudinaryUrl, // Prioritize signed URL
             fields: data.fields || []
           });
+          
+          try {
+            const blob = await signatureApi.getPublicDocumentPreview(token);
+            setPdfBlob(blob);
+          } catch (e) {
+            console.error('Failed to load public document preview proxy:', e);
+          }
         } else {
           setError('The signing request could not be found.');
         }
@@ -204,7 +212,7 @@ const PublicSign: React.FC = () => {
           <Card className="h-[80vh] overflow-auto flex flex-col">
              <CardContent className="flex-1 p-2 md:p-4 bg-gray-100 flex justify-center">
                 <PdfDocument
-                  file={requestData.fileUrl || null}
+                  file={pdfBlob || requestData.fileUrl || null}
                   onLoadSuccess={onDocumentLoadSuccess}
                   onLoadError={console.error}
                   loading={<div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />}

@@ -1,3 +1,4 @@
+import fetch from "node-fetch";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiErrors.js";
@@ -249,10 +250,54 @@ const sendReminder = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, {}, "Reminder sent successfully."));
 });
 
+const getPublicDocumentPreview = asyncHandler(async (req, res) => {
+    const { token } = req.params;
+    
+    if (!token) {
+        throw new ApiError(400, "Token is required");
+    }
+
+    const request = await SignatureRequest.findOne({ token }).populate('documentId');
+    if (!request) {
+        throw new ApiError(404, "Invalid signature token");
+    }
+
+    if (new Date() > new Date(request.expirationDate)) {
+        throw new ApiError(400, "Signature link has expired");
+    }
+
+    const document = request.documentId;
+    if (!document) {
+        throw new ApiError(404, "Document not found");
+    }
+
+    const fileUrl = document.signedFileUrl || document.cloudinaryUrl;
+    if (!fileUrl) {
+        throw new ApiError(404, "File URL not found");
+    }
+
+    try {
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+            throw new ApiError(500, "Failed to fetch document preview from storage");
+        }
+        res.setHeader("Content-Type", "application/pdf");
+        const contentLength = response.headers.get("content-length");
+        if (contentLength) {
+            res.setHeader("Content-Length", contentLength);
+        }
+        const buffer = Buffer.from(await response.arrayBuffer());
+        return res.send(buffer);
+    } catch (fetchError) {
+        throw new ApiError(500, `Failed to retrieve document file: ${fetchError.message}`);
+    }
+});
+
 export {
     createSignatureRequest,
     getSignatureRequests,
     getPublicSignatureRequest,
     submitSignature,
-    sendReminder
+    sendReminder,
+    getPublicDocumentPreview
 };

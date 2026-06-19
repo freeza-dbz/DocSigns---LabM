@@ -52,6 +52,18 @@ export const signatureApi = {
     }
   },
 
+  // Get public signature request document preview (CORS-friendly)
+  getPublicDocumentPreview: async (token: string) => {
+    try {
+      const response = await apiClient.get('/v1/signature-requests/public/' + token + '/preview', {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Submit signature
   submitSignature: async (
     token: string,
