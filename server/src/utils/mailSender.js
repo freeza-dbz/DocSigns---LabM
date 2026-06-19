@@ -30,23 +30,19 @@ const mailSender = async (email, title, body) => {
 
     try {
         const cleanPass = process.env.MAIL_PASS ? process.env.MAIL_PASS.replace(/\s+/g, '') : '';
+        
         const transporterConfig = {
+            host: process.env.MAIL_HOST || 'smtp.gmail.com',
+            port: process.env.MAIL_PORT ? parseInt(process.env.MAIL_PORT) : 587,
+            secure: process.env.MAIL_SECURE === 'true',
             auth: {
                 user: process.env.MAIL_USER,
                 pass: cleanPass,
+            },
+            tls: {
+                rejectUnauthorized: false // Bypass SSL/TLS errors in cloud containers
             }
         };
-
-        if (process.env.MAIL_HOST && process.env.MAIL_HOST.includes('gmail.com')) {
-            transporterConfig.service = 'gmail';
-        } else {
-            transporterConfig.host = process.env.MAIL_HOST;
-            transporterConfig.port = process.env.MAIL_PORT ? parseInt(process.env.MAIL_PORT) : 587;
-            transporterConfig.secure = process.env.MAIL_SECURE === 'true';
-            transporterConfig.tls = {
-                rejectUnauthorized: false
-            };
-        }
 
         const transporter = nodemailer.createTransport(transporterConfig);
 
