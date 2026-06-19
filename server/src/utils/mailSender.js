@@ -41,6 +41,9 @@ const mailSender = async (email, title, body) => {
             },
             tls: {
                 rejectUnauthorized: false // Bypass SSL/TLS errors in cloud containers
+            },
+            connectionOptions: {
+                family: 4 // Force IPv4 to avoid ENETUNREACH on Render
             }
         };
 
