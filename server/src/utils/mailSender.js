@@ -1,30 +1,22 @@
 import nodemailer from 'nodemailer';
 import dns from 'dns';
 
-/**
- * Creates a Nodemailer transporter configured for cloud environments (Render, etc.)
- * - Forces IPv4 via dnsLookup (avoids ENETUNREACH on IPv6-disabled hosts)
- * - Uses port 465 + SSL by default (more reliable than 587+STARTTLS on cloud)
- * - Adds connection timeouts to prevent hangs
- */
+
 const createTransporter = (cleanPass) => {
     return nodemailer.createTransport({
         host: process.env.MAIL_HOST || 'smtp.gmail.com',
-        port: 465,       // SSL — hardcoded; overrides any bad env value
-        secure: true,    // SSL — must be true for port 465
+        port: 465,
+        secure: true,
         auth: {
             user: process.env.MAIL_USER,
             pass: cleanPass,
         },
-        connectionTimeout: 10000,   // 10 s — prevent indefinite hangs
-        greetingTimeout: 10000,     // 10 s
-        socketTimeout: 15000,       // 15 s
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
         tls: {
-            rejectUnauthorized: false  // Allow self-signed certs in cloud containers
+            rejectUnauthorized: false
         },
-        // Force IPv4 DNS resolution — fixes ENETUNREACH on Render/cloud where
-        // IPv6 is unreachable. The old `connectionOptions: { family: 4 }` was
-        // silently ignored by Nodemailer; this dnsLookup callback is the correct fix.
         dnsLookup: (hostname, options, callback) => {
             dns.lookup(hostname, { ...options, family: 4 }, callback);
         }
@@ -32,7 +24,6 @@ const createTransporter = (cleanPass) => {
 };
 
 const mailSender = async (email, title, body) => {
-    // Check if SMTP environment variables are defined
     const hasSmtpConfig = process.env.MAIL_HOST && process.env.MAIL_USER && process.env.MAIL_PASS;
 
     // Extract links from the email body for dev debugging
@@ -53,9 +44,9 @@ const mailSender = async (email, title, body) => {
 
     if (!hasSmtpConfig) {
         console.log("\n⚠️  WARNING: SMTP env vars missing.");
-        console.log(`  MAIL_HOST  : ${process.env.MAIL_HOST  || '(not set)'}`);
-        console.log(`  MAIL_USER  : ${process.env.MAIL_USER  || '(not set)'}`);
-        console.log(`  MAIL_PASS  : ${process.env.MAIL_PASS  ? '(set, length=' + process.env.MAIL_PASS.length + ')' : '(not set)'}`);
+        console.log(`  MAIL_HOST  : ${process.env.MAIL_HOST || '(not set)'}`);
+        console.log(`  MAIL_USER  : ${process.env.MAIL_USER || '(not set)'}`);
+        console.log(`  MAIL_PASS  : ${process.env.MAIL_PASS ? '(set, length=' + process.env.MAIL_PASS.length + ')' : '(not set)'}`);
         console.log("Real emails cannot be delivered. Use the sign link above in your browser.");
         console.log("==================================================\n");
         return { messageId: "mocked-email-id-" + Date.now() };
