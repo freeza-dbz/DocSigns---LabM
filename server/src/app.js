@@ -4,8 +4,13 @@ import cookieParser from "cookie-parser";
 
 const app = express();
 
+const corsOrigin = process.env.CORS_ORIGIN;
+const allowedOrigins = corsOrigin && corsOrigin !== "*" 
+    ? corsOrigin.split(",").map(origin => origin.trim()) 
+    : "*";
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: allowedOrigins,
     credentials: true
 }));
 
