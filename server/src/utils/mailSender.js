@@ -1,11 +1,41 @@
 import nodemailer from 'nodemailer';
 import dns from 'dns';
 
+/**
+ * Creates a Nodemailer transporter configured for cloud environments (Render, etc.)
+ * - Forces IPv4 via dnsLookup (avoids ENETUNREACH on IPv6-disabled hosts)
+ * - Uses port 465 + SSL by default (more reliable than 587+STARTTLS on cloud)
+ * - Adds connection timeouts to prevent hangs
+ */
+const createTransporter = (cleanPass) => {
+    return nodemailer.createTransport({
+        host: process.env.MAIL_HOST || 'smtp.gmail.com',
+        port: 465,       // SSL — hardcoded; overrides any bad env value
+        secure: true,    // SSL — must be true for port 465
+        auth: {
+            user: process.env.MAIL_USER,
+            pass: cleanPass,
+        },
+        connectionTimeout: 10000,   // 10 s — prevent indefinite hangs
+        greetingTimeout: 10000,     // 10 s
+        socketTimeout: 15000,       // 15 s
+        tls: {
+            rejectUnauthorized: false  // Allow self-signed certs in cloud containers
+        },
+        // Force IPv4 DNS resolution — fixes ENETUNREACH on Render/cloud where
+        // IPv6 is unreachable. The old `connectionOptions: { family: 4 }` was
+        // silently ignored by Nodemailer; this dnsLookup callback is the correct fix.
+        dnsLookup: (hostname, options, callback) => {
+            dns.lookup(hostname, { ...options, family: 4 }, callback);
+        }
+    });
+};
+
 const mailSender = async (email, title, body) => {
     // Check if SMTP environment variables are defined
     const hasSmtpConfig = process.env.MAIL_HOST && process.env.MAIL_USER && process.env.MAIL_PASS;
-    
-    // Extract any links from the email body for easy debugging/clicking in local dev
+
+    // Extract links from the email body for dev debugging
     const links = [];
     const hrefRegex = /href="([^"]+)"/g;
     let match;
@@ -20,48 +50,29 @@ const mailSender = async (email, title, body) => {
         console.log(`Links found:`);
         links.forEach(link => console.log(`  🔗 ${link}`));
     }
-    
+
     if (!hasSmtpConfig) {
-        console.log("\n⚠️  WARNING: SMTP credentials (MAIL_HOST, MAIL_USER, MAIL_PASS) are not configured in your environment.");
-        console.log("Real emails cannot be delivered. Use the link(s) above in your browser to sign/view the document.");
+        console.log("\n⚠️  WARNING: SMTP env vars missing.");
+        console.log(`  MAIL_HOST  : ${process.env.MAIL_HOST  || '(not set)'}`);
+        console.log(`  MAIL_USER  : ${process.env.MAIL_USER  || '(not set)'}`);
+        console.log(`  MAIL_PASS  : ${process.env.MAIL_PASS  ? '(set, length=' + process.env.MAIL_PASS.length + ')' : '(not set)'}`);
+        console.log("Real emails cannot be delivered. Use the sign link above in your browser.");
         console.log("==================================================\n");
-        // Return a mock response so the calling controller can proceed smoothly
         return { messageId: "mocked-email-id-" + Date.now() };
     }
 
+    // Strip whitespace from App Password (Gmail shows it with spaces for readability)
+    const cleanPass = process.env.MAIL_PASS.replace(/\s+/g, '');
+    console.log(`  MAIL_HOST  : ${process.env.MAIL_HOST}`);
+    console.log(`  MAIL_USER  : ${process.env.MAIL_USER}`);
+    console.log(`  MAIL_PASS  : (length=${cleanPass.length}, expected 16 for Gmail App Password)`);
+    console.log(`  MAIL_FROM  : ${process.env.MAIL_FROM || '(using MAIL_USER)'}`);
+    console.log(`  SMTP config: host=smtp.gmail.com port=465 secure=true (IPv4 forced)`);
+
     try {
-        const cleanPass = process.env.MAIL_PASS ? process.env.MAIL_PASS.replace(/\s+/g, '') : '';
-        
-        // Determine port and secure setting
-        // Port 465 -> secure: true (SSL) — more reliable on cloud/Render
-        // Port 587 -> secure: false (STARTTLS)
-        const port = process.env.MAIL_PORT ? parseInt(process.env.MAIL_PORT) : 465;
-        const isSecure = process.env.MAIL_SECURE === 'true' || port === 465;
+        const transporter = createTransporter(cleanPass);
 
-        const transporterConfig = {
-            host: process.env.MAIL_HOST || 'smtp.gmail.com',
-            port,
-            secure: isSecure,
-            auth: {
-                user: process.env.MAIL_USER,
-                pass: cleanPass,
-            },
-            // Connection timeout settings to avoid hanging on Render/cloud envs
-            connectionTimeout: 10000,  // 10 seconds
-            greetingTimeout: 10000,    // 10 seconds
-            socketTimeout: 15000,      // 15 seconds
-            tls: {
-                rejectUnauthorized: false // Bypass SSL/TLS errors in cloud containers
-            },
-            // Force IPv4 to avoid ENETUNREACH on Render (IPv6 is often blocked)
-            dnsLookup: (hostname, options, callback) => {
-                dns.lookup(hostname, { ...options, family: 4 }, callback);
-            }
-        };
-
-        const transporter = nodemailer.createTransport(transporterConfig);
-
-        // Verify SMTP connection before sending (helps catch config issues early)
+        // Verify SMTP connection & auth before attempting to send
         await transporter.verify();
         console.log("✅ [SMTP CONNECTION VERIFIED]");
 
@@ -76,10 +87,15 @@ const mailSender = async (email, title, body) => {
         console.log(`✅ [EMAIL SENT SUCCESSFULLY] Message ID: ${info.messageId}`);
         console.log("==================================================\n");
         return info;
+
     } catch (error) {
-        console.error(`❌ [EMAIL SENDING FAILED] Error: ${error.message}`);
+        console.error(`❌ [EMAIL SENDING FAILED]`);
+        console.error(`   Message : ${error.message}`);
+        console.error(`   Code    : ${error.code || 'N/A'}`);
+        console.error(`   Response: ${error.response || 'N/A'}`);
+        console.error(`   Full err: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`);
         console.log("==================================================\n");
-        // Not throwing an error to avoid crashing the main process
+        // Do not throw — let the controller continue (signature request is already saved)
     }
 };
 
